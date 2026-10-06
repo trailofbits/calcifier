@@ -306,9 +306,10 @@ class _Flow:
             for value, target in bindings:
                 if not self.tainted(value, names):
                     continue
+                nodes = (target,) if isinstance(target, ast.arg) else ast.walk(target)
                 new = {
                     self.scoped_names[item]
-                    for item in ast.walk(target)
+                    for item in nodes
                     if isinstance(item, ast.Name | ast.arg)
                 } - names
                 if new:
