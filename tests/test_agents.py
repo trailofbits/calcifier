@@ -1014,7 +1014,10 @@ def test_native_failure_signal_rejects_a_valid_answer_and_retains_usage(
     assert transports[0]["status"] == "failed"
 
 
-def test_custom_adapter_receives_versioned_read_only_contract(monkeypatch, tmp_path: Path):
+@pytest.mark.parametrize("timeout, expected", [(None, 9), (2.5, 2.5)])
+def test_custom_adapter_receives_versioned_read_only_contract(
+    monkeypatch, tmp_path: Path, timeout: float | None, expected: float
+):
     captured = {}
 
     def fake_run(cmd, stdin, **kwargs):  # noqa: ANN001
@@ -1025,14 +1028,20 @@ def test_custom_adapter_receives_versioned_read_only_contract(monkeypatch, tmp_p
     contract = FilesystemContract.build(tmp_path, (tmp_path,))
 
     CommandCli("worker", ("adapter",), default_timeout=9).invoke(
-        "prompt", filesystem=contract, schema={"type": "boolean"}
+        "prompt", timeout=timeout, filesystem=contract, schema={"type": "boolean"}
     )
 
     assert captured["env"]["CALCIFIER_AGENT_PROTOCOL"] == "1"
     assert captured["env"]["CALCIFIER_AGENT_CONTRACT"] == json.dumps(
-        {"version": 1, "filesystem": contract.as_dict(), "schema": {"type": "boolean"}},
+        {
+            "version": 1,
+            "filesystem": contract.as_dict(),
+            "schema": {"type": "boolean"},
+            "timeout_seconds": expected,
+        },
         sort_keys=True,
     )
+    assert captured["timeout"] == expected
 
 
 @pytest.mark.parametrize(
