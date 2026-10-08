@@ -9,9 +9,61 @@ from pathlib import Path
 
 import pytest
 
-from calcifier import cli
+from calcifier import RecipeRun, cli
 from calcifier.recipe import load_recipe
 from calcifier.trace_export import validate_trace
+
+
+@pytest.mark.parametrize("entrypoint", ["exec", "recipe"])
+@pytest.mark.parametrize(("declared", "override"), [(None, 10), (60, 10), (10, 60)])
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["LF", "CRLF"])
+def test_live_budget_query_observes_effective_cli_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entrypoint: str,
+    declared: float | None,
+    override: float,
+    newline: str,
+) -> None:
+    runs: list[RecipeRun] = []
+    render = RecipeRun.render
+
+    def capture_run(run: RecipeRun) -> str:
+        runs.append(run)
+        return render(run)
+
+    monkeypatch.setattr(RecipeRun, "render", capture_run)
+    budget = "" if declared is None else f", budget=Budget(None, {declared})"
+    path = tmp_path / "recipe.py"
+    source = f'''from calcifier import Budget, recipe, step
+
+@step
+def inspect() -> float:
+    return Budget.remaining_wall_seconds()
+
+@recipe(version="0.1"{budget})
+def main() -> float:
+    return inspect()
+'''
+    path.write_bytes(source.replace("\n", newline).encode("utf-8"))
+    trace = tmp_path / "trace.json"
+    args = ["--max-wall-seconds", str(override)]
+    if entrypoint == "exec":
+        status = cli.main(["exec", str(path), "--trust", *args, "--trace-out", str(trace)])
+        validate_trace(json.loads(trace.read_text(encoding="utf-8")))
+    else:
+        status = load_recipe(path).cli(args)
+    assert status == 0
+    assert len(runs) == 1
+    run = runs[0]
+    assert run.state == "completed"
+    assert run.budget is not None
+    assert run.budget["max_wall_seconds"] == 10
+    assert run.budget["attempted_agent_calls"] == 0
+    assert isinstance(run.output, float)
+    assert 0 < run.output <= 10
+    assert run.records[0].output == run.output
+    assert path.read_bytes() == source.replace("\n", newline).encode("utf-8")
 
 
 @pytest.mark.parametrize("entrypoint", ["exec", "recipe"])

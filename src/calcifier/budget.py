@@ -27,6 +27,16 @@ class Budget:
         if not is_positive_number(self.max_wall_seconds, finite=True):
             raise ValueError("max_wall_seconds must be positive and finite")
 
+    @staticmethod
+    def remaining_wall_seconds() -> float:
+        """Return the active run's effective time left, including suspension."""
+        from .trace import current
+
+        ctx = current()
+        if ctx is None or ctx.budget_state is None:
+            raise RecipeFailure("remaining wall time requires an active budgeted recipe run")
+        return ctx.budget_state.remaining_wall_seconds()
+
 
 @dataclass
 class BudgetState:
