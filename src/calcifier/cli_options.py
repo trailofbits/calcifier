@@ -10,7 +10,11 @@ from .validation import is_positive_number
 
 
 def add_agent_flags(
-    parser: argparse.ArgumentParser, *, internal: bool = False, wall_budget: bool = True
+    parser: argparse.ArgumentParser,
+    *,
+    internal: bool = False,
+    wall_budget: bool = True,
+    call_budget: bool = True,
 ) -> None:
     prefix = "_" if internal else ""
     parser.add_argument(
@@ -27,6 +31,13 @@ def add_agent_flags(
         metavar="ROLE=SECONDS",
         help="override one configured role deadline",
     )
+    if wall_budget and call_budget:
+        parser.add_argument(
+            "--max-agent-calls",
+            dest=f"{prefix}max_agent_calls",
+            type=int,
+            help="limit charged agent attempts, including structured-output retries",
+        )
     if wall_budget:
         parser.add_argument(
             "--max-wall-seconds",
@@ -73,14 +84,25 @@ def resolve_output_directory(declared: Path | None, override: Path | None) -> Pa
     return destination
 
 
-def shorten_budget(declared: Budget | None, override: float | None) -> Budget | None:
-    if override is None:
+def shorten_budget(
+    declared: Budget | None, override: float | None, max_agent_calls: int | None = None
+) -> Budget | None:
+    if override is None and max_agent_calls is None:
         return declared
-    if not is_positive_number(override, finite=True):
+    if override is not None and not is_positive_number(override, finite=True):
         raise ValueError("--max-wall-seconds must be positive")
-    if declared is None:
-        return Budget(max_agent_calls=None, max_wall_seconds=override)
-    return Budget(
-        max_agent_calls=declared.max_agent_calls,
-        max_wall_seconds=min(declared.max_wall_seconds, override),
-    )
+    if max_agent_calls is not None and not is_positive_number(max_agent_calls, integral=True):
+        raise ValueError("--max-agent-calls must be a positive integer")
+    call_limit = declared.max_agent_calls if declared is not None else None
+    if max_agent_calls is not None:
+        call_limit = max_agent_calls if call_limit is None else min(call_limit, max_agent_calls)
+    wall_limit = declared.max_wall_seconds if declared is not None else override
+    if override is not None and wall_limit is not None:
+        wall_limit = min(wall_limit, override)
+    if wall_limit is None:
+        if call_limit is not None:
+            raise ValueError(
+                "--max-agent-calls requires a declared wall budget or --max-wall-seconds"
+            )
+        return None
+    return Budget(max_agent_calls=call_limit, max_wall_seconds=wall_limit)

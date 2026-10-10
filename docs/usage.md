@@ -94,6 +94,12 @@ without running the recipe.
 shortens the declared wall budget, or adds a wall limit to an unbudgeted
 deterministic recipe; it adds no agent-call limit.
 
+`--max-agent-calls N` limits charged agent attempts, including structured-output
+retries. It can shorten a declared call limit but cannot increase it. Without a
+declared wall budget, also supply `--max-wall-seconds`. Both budget flags work
+with `exec`, `debug`, and direct recipe execution. The effective call override
+is recorded in the runtime trace.
+
 Recipes also run directly with `python recipe.py --parameter-name VALUE`.
 Parameters become kebab-case flags; booleans have `--name` and `--no-name`.
 Direct execution bypasses the CLI trust check. Use `calcifier exec` for reviewed

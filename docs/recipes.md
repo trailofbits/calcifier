@@ -94,6 +94,10 @@ command nor creates its files. See [effect boundaries](architecture.md#effects-a
 Include possible parse retries and child calls. Agent-backed recipes require a
 budget. `fail("reason")` ends a recipe with a reported failure.
 
+`Budget.remaining_wall_seconds()` returns the active run's effective time left,
+including system suspension. Call it inside a budgeted recipe to allocate time
+to remaining work; it raises `RecipeFailure` outside an active budgeted run.
+
 `parallel(fn, items, on_result=callback)` propagates the run context and shared
 budget, dispatches isolated workers, and returns results in input order.
 Workers cannot mutate shared state. `on_result(item, result)` runs serially in

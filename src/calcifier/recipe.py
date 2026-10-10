@@ -697,7 +697,9 @@ class Recipe:
         if tool_registry is None:
             return 2
         try:
-            effective_budget = shorten_budget(self.budget, ns._max_wall_seconds)
+            effective_budget = shorten_budget(
+                self.budget, ns._max_wall_seconds, ns._max_agent_calls
+            )
             output_directory = resolve_output_directory(self.output_root, ns._output_directory)
         except (ValueError, OSError) as exc:
             parser.error(str(exc))
