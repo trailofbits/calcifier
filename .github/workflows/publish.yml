@@ -1,0 +1,127 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+# Releases are immutable and serialized through the GitHub release event;
+# we still set workflow-level concurrency so a botched re-tag of the same
+# release cannot race a previous publish run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Verify release tag is a vX.Y.Z[-pre] version
+        run: |
+          set -euo pipefail
+          if ! printf '%s\n' "$RELEASE_TAG" \
+              | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.?[0-9]+)?$'; then
+            echo "release tag '$RELEASE_TAG' does not match a publishable pattern" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Verify annotated signed tag and main reachability
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if [ "$(git cat-file -t "$RELEASE_TAG")" != tag ]; then
+            echo "$RELEASE_TAG is not an annotated tag" >&2
+            exit 1
+          fi
+          REF_JSON="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")"
+          TAG_OBJECT="$(printf '%s' "$REF_JSON" | jq -r '.object.sha')"
+          TAG_JSON="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_OBJECT")"
+          if [ "$(printf '%s' "$TAG_JSON" | jq -r '.verification.verified')" != true ]; then
+            printf '%s\n' "$TAG_JSON" | jq '.verification' >&2
+            exit 1
+          fi
+          TAG_COMMIT="$(printf '%s' "$TAG_JSON" | jq -r '.object.sha')"
+          git merge-base --is-ancestor "$TAG_COMMIT" origin/main
+          test "$TAG_COMMIT" = "$(git rev-parse HEAD)"
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          # Release artifacts must not depend on caches writable by lower-trust workflows.
+          enable-cache: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - run: uv sync --all-groups --locked
+
+      - name: Verify every source version surface
+        run: uv run python scripts/verify_artifacts.py --source-only --release-tag "$RELEASE_TAG"
+
+      - name: Re-run release verification suite
+        run: |
+          make verify
+          uv run coverage run -m pytest -q tests/
+          uv run coverage report
+
+      - name: Audit locked dependencies
+        run: |
+          uv export --frozen --all-groups --format requirements-txt \
+            --no-emit-project -o requirements-frozen.txt
+          uvx pip-audit -r requirements-frozen.txt --disable-pip --strict
+
+      - run: uv build
+
+      - name: Verify artifact contents and versions
+        run: uv run python scripts/verify_artifacts.py dist/
+
+      - run: uvx twine check dist/*
+
+      - name: Smoke-import the wheel
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/wheel-check
+          /tmp/wheel-check/bin/pip install dist/*.whl
+          /tmp/wheel-check/bin/calcifier --version
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write       # OIDC trusted publishing for pypa/gh-action-pypi-publish.
+      attestations: write   # actions/attest-build-provenance signs the wheel + sdist.
+      contents: read        # Read-only checkout of release metadata.
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: "dist/*"
+
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
+        with:
+          attestations: true

@@ -1,0 +1,8 @@
+{
+  "kind": "baseline",
+  "run": {
+    "inputs": {"output_dir": "out"},
+    "responses": {"worker": {"markdown": "- Fixed the parser.\n"}},
+    "artifacts": ["out/changelog-entry.md"]
+  }
+}

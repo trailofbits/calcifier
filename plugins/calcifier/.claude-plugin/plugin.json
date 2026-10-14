@@ -1,0 +1,13 @@
+{
+  "name": "calcifier",
+  "version": "0.1.0",
+  "description": "Calcify Claude/Codex skills into deterministic, validated agent pipelines.",
+  "author": {
+    "name": "Trail of Bits",
+    "url": "https://www.trailofbits.com"
+  },
+  "homepage": "https://github.com/trailofbits/calcifier",
+  "repository": "https://github.com/trailofbits/calcifier",
+  "license": "MIT",
+  "keywords": ["agents", "claude", "codex", "skills", "workflows"]
+}

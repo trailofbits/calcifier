@@ -1,0 +1,181 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHONWARNDEFAULTENCODING: "1"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - run: uv sync --all-groups --locked
+
+      - run: make lockcheck lint portable
+
+  type-check:
+    name: Type check (ty)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - run: uv sync --all-groups --locked
+
+      - run: make typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # "Test (3.13)" and "Test (3.14)" are required status checks in the main
+        # branch ruleset; removing a version leaves its check pending forever.
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - run: uv sync --all-groups --locked
+
+      - run: uv run pytest -q -n auto tests/
+
+  windows-test:
+    name: Windows test (3.13)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - run: uv sync --all-groups --locked
+
+      - run: uv run pytest -q -n auto tests/
+
+  dep-audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Export locked requirements
+        run: |
+          uv export --frozen --all-groups --format requirements-txt \
+            --no-emit-project -o requirements-frozen.txt
+
+      - name: Run pip-audit against the lockfile export
+        run: uvx pip-audit -r requirements-frozen.txt --disable-pip --strict
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - run: uv sync --all-groups --locked
+
+      - run: uv run coverage run --branch -m pytest -q tests/
+
+      - name: Coverage report (gate)
+        run: uv run coverage report
+
+      - name: Coverage XML for upload
+        run: uv run coverage xml -o coverage.xml
+
+      - name: Upload coverage XML
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+  build:
+    name: Build sdist + wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Seed deliberately dirty workstation state
+        run: |
+          mkdir -p .claude .hypothesis .vivisect
+          touch .claude/release-leak .hypothesis/release-leak .vivisect/release-leak
+
+      - run: uv build
+
+      - name: Verify artifact contents and version surfaces
+        run: uv run python scripts/verify_artifacts.py dist/
+
+      - run: uvx twine check dist/*
+
+      - name: Smoke-import the wheel
+        run: |
+          python -m venv /tmp/wheel-check
+          /tmp/wheel-check/bin/pip install dist/*.whl
+          /tmp/wheel-check/bin/python -c "import calcifier; print(calcifier.__version__)"
+          /tmp/wheel-check/bin/calcifier --version

@@ -1,0 +1,56 @@
+{
+  "source": "https://github.com/C2SP/CCTV/blob/50a8ecf2a220f4c8bdc4f085789b8e85c26829e7/sequencehash/hash/vectors_sha256.json",
+  "vectors": [
+    {
+      "customizer": "544553545f7368613235365f36613065623832615f68617368",
+      "inputs": [
+        "f14b70444c435f0df41a8685c88e",
+        "0d",
+        "a7956c016d21e337e0ec36794a",
+        "a622b99256d00147d4a7",
+        "41a77edb5e",
+        "",
+        "ae2ac7ae6bde",
+        "39c4b7664992dd710842b98c",
+        "8ed54c56b90aae9ce202",
+        "14",
+        "6629b30e7315e1d84b",
+        "03512ee379098b9b1158",
+        "80fb",
+        "e5b026aff943052d92",
+        "7a6073a2",
+        "5cf680aa",
+        "9142b65d86c234db7e5a1b",
+        "",
+        "bf",
+        "4a09c51c1c20cc7cebe190c38b",
+        "855b37b1"
+      ],
+      "final_output": "4f2ad0a700dcf692321549631deb84b15771a55b399224c5b384b19d1649f9cb",
+      "index": 0
+    },
+    {
+      "customizer": "544553545f7368613235365f35306230313664615f68617368",
+      "inputs": [
+        "20c4e53a43744d",
+        "5c6acc532efae60dacf191"
+      ],
+      "final_output": "e47fbbf31baacb0d31af2beb7e5012fd43eba133f29e103371aadb7c6c62be08",
+      "index": 4
+    },
+    {
+      "customizer": "544553545f7368613235365f32396334333064375f68617368",
+      "inputs": [],
+      "final_output": "d33c1a8496ecf85acf494dee48539e910e8fb91db67b4899b0084f5bcded4b41",
+      "index": 48
+    },
+    {
+      "customizer": "544553545f7368613235365f31393064336434325f68617368",
+      "inputs": [
+        "da25886e3ad05f"
+      ],
+      "final_output": "1095e7bb049fc0846e5343ab0eb1d4c7b645d99a2d3657667378476cd4d8ff2f",
+      "index": 55
+    }
+  ]
+}

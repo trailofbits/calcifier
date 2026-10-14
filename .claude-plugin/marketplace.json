@@ -1,0 +1,15 @@
+{
+  "name": "calcifier",
+  "owner": {
+    "name": "Trail of Bits",
+    "url": "https://www.trailofbits.com"
+  },
+  "description": "Typed, executable Python recipes for Claude and Codex skills.",
+  "plugins": [
+    {
+      "name": "calcifier",
+      "source": "./plugins/calcifier",
+      "description": "Calcify, execute, debug, and update typed agent recipes"
+    }
+  ]
+}

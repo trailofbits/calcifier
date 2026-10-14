@@ -1,0 +1,764 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trailofbits.github.io/calcifier/trace-schema.json",
+  "title": "Calcifier trace schema v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agent_calls",
+    "agent_preflight",
+    "agent_runtime",
+    "artifacts",
+    "duration_seconds",
+    "error",
+    "inputs",
+    "ok",
+    "output",
+    "budget",
+    "recipe",
+    "state",
+    "steps",
+    "tool_preflight",
+    "version"
+  ],
+  "properties": {
+    "version": {
+      "const": "1"
+    },
+    "state": {
+      "enum": [
+        "running",
+        "completed",
+        "failed",
+        "interrupted"
+      ]
+    },
+    "recipe": {
+      "$ref": "#/$defs/recipe"
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "output": {},
+    "output_directory": {
+      "type": ["string", "null"]
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "duration_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "budget": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/budget"
+        }
+      ]
+    },
+    "agent_runtime": {
+      "$ref": "#/$defs/agentRuntime"
+    },
+    "agent_preflight": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/agentPreflight"
+        }
+      ]
+    },
+    "tool_preflight": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/toolPreflight"
+        }
+      ]
+    },
+    "agent_calls": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/agentCall"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "agent_transport": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Bounded native transport diagnostics; separate from user-emitted artifacts."
+    }
+  },
+  "$defs": {
+    "agentRuntime": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "const": "host"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "configuration_hash",
+            "agents"
+          ],
+          "properties": {
+            "mode": {
+              "const": "configured"
+            },
+            "configuration_hash": {
+              "type": "string",
+              "minLength": 1
+            },
+            "agents": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/agentRoute"
+              }
+            },
+            "overrides": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "agent_timeouts",
+                "max_wall_seconds"
+              ],
+              "properties": {
+                "agent_timeouts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "max_wall_seconds": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "agentRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_type",
+        "target_name",
+        "runtime",
+        "configured_model",
+        "reasoning_effort",
+        "model_identity_source",
+        "timeout_seconds"
+      ],
+      "properties": {
+        "target_type": {
+          "enum": [
+            "builtin",
+            "command"
+          ]
+        },
+        "target_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runtime": {
+          "type": "object"
+        },
+        "configured_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reasoning_effort": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_identity_source": {
+          "enum": [
+            "configured",
+            "provider_reported",
+            "unavailable"
+          ]
+        },
+        "timeout_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "agentCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "target_type",
+        "target_name",
+        "runtime",
+        "filesystem",
+        "configuration_hash",
+        "configured_model",
+        "provider_reported_model",
+        "reasoning_effort",
+        "model_identity_source",
+        "attempts",
+        "error",
+        "duration_seconds",
+        "usage",
+        "prompt_bytes",
+        "schema_bytes",
+        "usage_reported_attempts"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_type": {
+          "enum": [
+            "builtin",
+            "command"
+          ]
+        },
+        "target_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runtime": {
+          "type": "object"
+        },
+        "filesystem": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/filesystem"
+            }
+          ]
+        },
+        "configuration_hash": {
+          "type": "string"
+        },
+        "configured_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_reported_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reasoning_effort": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_identity_source": {
+          "enum": [
+            "configured",
+            "provider_reported",
+            "unavailable"
+          ]
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "prompt_bytes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "schema_bytes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "usage_reported_attempts": {
+          "type": "object",
+          "description": "Per-field counts of successful provider attempts with final numeric usage. An absent field in this map means zero reports. Partial failure usage contributes observations but no final report.",
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cache_read_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cache_write_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "nested_model_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cost_usd": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "filesystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "working_directory",
+        "readable_paths",
+        "writable_paths"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "read-only",
+            "read-write"
+          ]
+        },
+        "working_directory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "readable_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "writable_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_agent_calls",
+        "max_wall_seconds",
+        "attempted_agent_calls"
+      ],
+      "properties": {
+        "max_agent_calls": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "max_wall_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "attempted_agent_calls": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "agentPreflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agents",
+        "ok"
+      ],
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "target_type",
+              "target_name",
+              "runtime",
+              "available",
+              "remediation"
+            ],
+            "properties": {
+              "role": {
+                "type": "string"
+              },
+              "target_type": {
+                "enum": [
+                  "builtin",
+                  "command"
+                ]
+              },
+              "target_name": {
+                "type": "string"
+              },
+              "runtime": {
+                "type": "object"
+              },
+              "available": {
+                "type": "boolean"
+              },
+              "remediation": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "ok": {
+          "type": "boolean"
+        }
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        }
+      }
+    },
+    "toolCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "kwargs",
+        "result",
+        "error",
+        "duration_seconds"
+      ],
+      "properties": {
+        "tool": {
+          "type": "string"
+        },
+        "kwargs": {
+          "type": "object"
+        },
+        "result": {},
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "sideEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "target",
+        "idempotency_key",
+        "payload",
+        "reversible",
+        "completed",
+        "error"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "file_write",
+            "external_object",
+            "publish",
+            "delete",
+            "other"
+          ]
+        },
+        "target": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "object"
+        },
+        "reversible": {
+          "type": "boolean"
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "inputs",
+        "output",
+        "error",
+        "duration_seconds",
+        "tool_calls",
+        "side_effects",
+        "subrecipe",
+        "children"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "object"
+        },
+        "output": {},
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/toolCall"
+          }
+        },
+        "agent_calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/agentCall"
+          }
+        },
+        "side_effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sideEffect"
+          }
+        },
+        "subrecipe": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "hash"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "hash": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        }
+      }
+    },
+    "toolPreflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "missing",
+        "ok"
+      ],
+      "properties": {
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "remediation"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "remediation": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "ok": {
+          "type": "boolean"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {}
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "cache_read_tokens",
+        "cache_write_tokens",
+        "nested_model_tokens",
+        "cost_usd"
+      ],
+      "properties": {
+        "input_tokens": {
+          "type": [
+            "integer",
+            "number",
+            "null"
+          ]
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "number",
+            "null"
+          ]
+        },
+        "cache_read_tokens": {
+          "type": [
+            "integer",
+            "number",
+            "null"
+          ]
+        },
+        "cache_write_tokens": {
+          "type": [
+            "integer",
+            "number",
+            "null"
+          ]
+        },
+        "nested_model_tokens": {
+          "type": [
+            "integer",
+            "number",
+            "null"
+          ]
+        },
+        "cost_usd": {
+          "type": [
+            "integer",
+            "number",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
