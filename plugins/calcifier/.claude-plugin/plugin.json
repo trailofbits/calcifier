@@ -1,6 +1,6 @@
 {
   "name": "calcifier",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Calcify Claude/Codex skills into deterministic, validated agent pipelines.",
   "author": {
     "name": "Trail of Bits",

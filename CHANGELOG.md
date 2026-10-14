@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.1 — 2026-10-14
+
+Release metadata update for the first PyPI publication. The v0.1.0 GitHub
+release used an unsigned lightweight tag and failed the signed-tag publishing
+check. This release contains the features documented below for v0.1.0.
+
 ## v0.1.0 — 2026-10-14
 
 First public release of Calcifier. Write Python workflows that combine
