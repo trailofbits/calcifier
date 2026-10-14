@@ -171,6 +171,10 @@
                     "number",
                     "null"
                   ]
+                },
+                "max_agent_calls": {
+                  "type": ["integer", "null"],
+                  "minimum": 1
                 }
               }
             }

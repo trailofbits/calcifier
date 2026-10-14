@@ -18,7 +18,10 @@ First public release. Requires Python 3.13 or newer.
   and one parse retry. `fail()` aborts; `emit()` exposes named artifacts.
 - **Agent roles and budgets.** Configure Claude, Codex, or custom argv adapters
   by semantic role. Steps, parallel workers, and children share call and wall
-  limits. Entry signatures generate typed CLI flags.
+  limits. Entry signatures generate typed CLI flags. `--max-agent-calls` bounds
+  charged attempts, including parse retries, without increasing declared limits.
+  `Budget.remaining_wall_seconds()` exposes the active run's effective time left.
+  Custom command adapters receive their effective timeout in the call contract.
 - **Instruction delivery.** File-based recipes pin original instructions and
   references. `prepare_context()` bundles complete tasks and prior results
   without duplicating prompts or changing the project working directory.
@@ -52,7 +55,8 @@ First public release. Requires Python 3.13 or newer.
 - **Behavioral checks.** Source checks reject certain runtime failures, unsafe
   effects, model-controlled paths/commands, and races. Style and type precision
   do not reject runnable candidates. Stub execution reports coverage gaps
-  without promoting them to passes.
+  without promoting them to passes. Parameter value taint does not propagate
+  into names used only in type annotations.
 - **Provider boundaries.** Host agents use explicit filesystem contracts and
   clean settings. Subprocesses run without a shell under time/output limits.
 - **Strict records and redaction.** Malformed trace/trust data fails closed.

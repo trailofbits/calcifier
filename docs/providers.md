@@ -75,7 +75,8 @@ includes `CALCIFIER_AGENT_PROTOCOL=1` and a JSON `CALCIFIER_AGENT_CONTRACT`:
     "readable_paths": ["/absolute/target", "/absolute/skill/references"],
     "writable_paths": []
   },
-  "schema": {"type": "object", "properties": {}, "required": []}
+  "schema": {"type": "object", "properties": {}, "required": []},
+  "timeout_seconds": 300
 }
 ```
 
@@ -85,6 +86,10 @@ text; optional usage keys are `input_tokens`, `output_tokens`,
 `cache_read_input_tokens`, `cache_creation_input_tokens`, `nested_model_tokens`,
 and `cost_usd`. Values must be nonnegative and finite. Missing or invalid values
 become `null`; explicit zero remains zero.
+
+`timeout_seconds` is the effective process timeout, after applying any per-call
+override and remaining shared wall budget. Adapters can use it to give their
+agents a deadline; Calcifier still enforces the timeout externally.
 
 ## Tool providers
 

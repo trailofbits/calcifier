@@ -205,6 +205,7 @@ def test_custom_adapter_request_includes_writable_paths(monkeypatch, tmp_path: P
         "version": 1,
         "filesystem": contract.as_dict(),
         "schema": {"type": "boolean"},
+        "timeout_seconds": 5,
     }
 
 

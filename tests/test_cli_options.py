@@ -19,3 +19,21 @@ def test_wall_override_without_declared_budget_has_no_call_limit() -> None:
 def test_budget_override_rejects_nonfinite_values(override: float) -> None:
     with pytest.raises(ValueError, match="--max-wall-seconds must be positive"):
         shorten_budget(Budget(2, 60), override)
+
+
+@pytest.mark.parametrize("limit", [0, -1, True, 1.5])
+def test_call_override_rejects_invalid_limits(limit: int) -> None:
+    with pytest.raises(ValueError, match="--max-agent-calls must be a positive integer"):
+        shorten_budget(Budget(None, 60), None, limit)
+
+
+def test_call_override_preserves_stricter_declared_limits() -> None:
+    assert shorten_budget(Budget(2, 60), 90, 5) == Budget(2, 60)
+    assert shorten_budget(Budget(5, 60), 30, 2) == Budget(2, 30)
+    assert shorten_budget(Budget(None, 60), None, 2) == Budget(2, 60)
+    assert shorten_budget(None, 30, 2) == Budget(2, 30)
+
+
+def test_call_override_without_wall_budget_is_not_silently_ignored() -> None:
+    with pytest.raises(ValueError, match="requires a declared wall budget"):
+        shorten_budget(None, None, 2)

@@ -183,6 +183,7 @@ def _agent_runtime_for_args(
         result = registry.runtime_summary(providers)
         result["overrides"] = {
             "agent_timeouts": sorted(getattr(args, "agent_timeout", [])),
+            "max_agent_calls": getattr(args, "max_agent_calls", None),
             "max_wall_seconds": getattr(args, "max_wall_seconds", None),
         }
         return result
@@ -603,7 +604,11 @@ def _run_recipe(args: argparse.Namespace, *, verbose: bool) -> int:  # noqa: C90
 
 def _budget_for_args(recipe_obj: Any, args: argparse.Namespace) -> Budget | None:
     try:
-        return shorten_budget(recipe_obj.budget, getattr(args, "max_wall_seconds", None))
+        return shorten_budget(
+            recipe_obj.budget,
+            getattr(args, "max_wall_seconds", None),
+            getattr(args, "max_agent_calls", None),
+        )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
 
@@ -738,7 +743,7 @@ def _add_graph_commands(sub: argparse._SubParsersAction) -> None:
     build.add_argument("spec", type=Path)
     _add_compilation_timeout_flag(build)
     _add_compiler_call_limit_flag(build)
-    add_agent_flags(build)
+    add_agent_flags(build, call_budget=False)
     build.set_defaults(handler=_cmd_build_graph)
 
 

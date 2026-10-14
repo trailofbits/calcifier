@@ -161,11 +161,13 @@ def host_provider_check(provider: str) -> tuple[list[str], tuple[str, ...]]:
 def command_adapter_environment(
     filesystem: FilesystemContract | None,
     schema: dict[str, Any] | None,
+    timeout_seconds: float | None,
 ) -> dict[str, str]:
     contract = {
         "version": 1,
         "filesystem": None if filesystem is None else filesystem.as_dict(),
         "schema": schema,
+        "timeout_seconds": timeout_seconds,
     }
     environment = dict(os.environ)
     environment["CALCIFIER_AGENT_PROTOCOL"] = "1"
@@ -314,11 +316,12 @@ class CommandCli(AgentProvider):
         filesystem: FilesystemContract | None = None,
         schema: dict[str, Any] | None = None,
     ) -> AgentResult:
-        adapter_env = command_adapter_environment(filesystem, schema)
+        effective_timeout = self.effective_timeout(timeout)
+        adapter_env = command_adapter_environment(filesystem, schema, effective_timeout)
         return _run_cli(
             list(self.command),
             stdin=prompt,
-            timeout=self.effective_timeout(timeout),
+            timeout=effective_timeout,
             name=self.name,
             filesystem=filesystem,
             env=adapter_env,

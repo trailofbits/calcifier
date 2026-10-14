@@ -45,6 +45,21 @@ def _line(source: str, text: str) -> int:
     return next(number for number, line in enumerate(lines, 1) if text in line)
 
 
+@pytest.mark.parametrize("annotation", ["str", "list[str]", "dict[str, str]", "str | None"])
+@pytest.mark.parametrize("model_path", [False, True])
+def test_parameter_annotations_do_not_taint_type_names(annotation, model_path):
+    directory = "message" if model_path else "root"
+    errors = _errors(f"""
+def forward(root: str, message: {annotation}):
+    return agent("reader", "Read: {{message}}", message=message, working_directory=root)
+def run(root):
+    message = agent("writer", "Describe", working_directory=root)
+    forward({directory}, message)
+    return run_command(["cat", str(root)], timeout_seconds=1)
+""")
+    assert bool(errors) == model_path
+
+
 @pytest.mark.parametrize("field", ["directory", "prompt"])
 @pytest.mark.parametrize("declaration", ["context", "context: PreparedContext"])
 def test_prepared_context_directory_is_host_issued_but_prompt_stays_tainted(field, declaration):

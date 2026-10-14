@@ -9,6 +9,8 @@ import pytest
 
 from calcifier.budget import Budget, BudgetExceeded, BudgetState
 from calcifier.clock import SuspendAwareTimer
+from calcifier.exceptions import RecipeFailure
+from calcifier.trace import active_run
 
 
 @pytest.mark.parametrize("value", [True, False, 0, -1, 1.5, "1"])
@@ -50,6 +52,50 @@ def test_budget_is_frozen() -> None:
 
     with pytest.raises(FrozenInstanceError):
         budget.max_agent_calls = 2  # ty: ignore[invalid-assignment]
+
+
+def test_live_budget_query_requires_an_active_budgeted_run() -> None:
+    with pytest.raises(RecipeFailure, match="active budgeted recipe run"):
+        Budget.remaining_wall_seconds()
+    with active_run(), pytest.raises(RecipeFailure, match="active budgeted recipe run"):
+        Budget.remaining_wall_seconds()
+
+
+@pytest.mark.parametrize(
+    ("monotonic_elapsed", "wall_elapsed", "remaining"),
+    [(2, 2, 8), (0, 7, 3), (3, -100, 7), (0, 11, -1)],
+)
+def test_live_budget_query_uses_run_clock_without_charging_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+    monotonic_elapsed: float,
+    wall_elapsed: float,
+    remaining: float,
+) -> None:
+    monkeypatch.setattr("calcifier.clock._CONTINUOUS_CLOCK", None)
+    monkeypatch.setattr("calcifier.clock.time.monotonic", lambda: 10 + monotonic_elapsed)
+    monkeypatch.setattr("calcifier.clock.time.time", lambda: 100 + wall_elapsed)
+    state = BudgetState(
+        Budget(1, 10),
+        _timer=SuspendAwareTimer(10, 100, None),
+    )
+    with active_run(budget_state=state):
+        assert Budget.remaining_wall_seconds() == remaining
+        assert Budget.remaining_wall_seconds() == remaining
+    assert state.attempted_calls == 0
+
+
+def test_live_budget_query_restores_parent_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("calcifier.clock._CONTINUOUS_CLOCK", None)
+    monkeypatch.setattr("calcifier.clock.time.monotonic", lambda: 10)
+    monkeypatch.setattr("calcifier.clock.time.time", lambda: 100)
+    parent = BudgetState(Budget(1, 30))
+    child = BudgetState(Budget(1, 7))
+    with active_run(budget_state=parent):
+        assert Budget.remaining_wall_seconds() == 30
+        with active_run(budget_state=child):
+            assert Budget.remaining_wall_seconds() == 7
+        assert Budget.remaining_wall_seconds() == 30
+    assert parent.attempted_calls == child.attempted_calls == 0
 
 
 def test_budget_state_repr_excludes_timer_and_lock() -> None:
