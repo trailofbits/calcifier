@@ -1,0 +1,141 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "calcifier"
+version = "0.1.0"
+description = "Compile agent skills into runnable Python workflows."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.13"
+authors = [{ name = "Scott Arciszewski", email = "scott.arciszewski@trailofbits.com" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = [
+    "jsonschema>=4.21,<5",
+    "pydantic>=2.13.4",
+    "ruff>=0.12.0,<1.0",
+    # Type-checks generated recipes. Pre-1.0 diagnostics change between releases, so pin exactly.
+    "ty==0.0.81",
+]
+
+[project.urls]
+Homepage = "https://github.com/trailofbits/calcifier"
+Repository = "https://github.com/trailofbits/calcifier"
+Issues = "https://github.com/trailofbits/calcifier/issues"
+Changelog = "https://github.com/trailofbits/calcifier/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/trailofbits/calcifier/tree/main/docs"
+Security = "https://github.com/trailofbits/calcifier/security/policy"
+
+[dependency-groups]
+dev = [
+    "packaging>=24,<27",
+    "pytest>=9.0.3,<10",  # GHSA-6w46-j5rx-g56g (CVE-2025-71176): tmpdir handling fix
+    "coverage[toml]>=7.6,<8",
+    "pytest-gremlins>=1.8.1",
+    "pytest-xdist>=3.8,<4",  # `gmake test` / CI test jobs only; coverage and mutation stay serial
+    "hypothesis>=6.100,<7",
+]
+
+[project.scripts]
+calcifier = "calcifier.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/calcifier"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"docs/trace-schema.json" = "calcifier/trace-schema.json"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/.claude-plugin/marketplace.json",
+    "/.github/dependabot.yml",
+    "/.github/workflows/*.yml",
+    "/AGENTS.md",
+    "/CHANGELOG.md",
+    "/CODE_OF_CONDUCT.md",
+    "/CONTRIBUTING.md",
+    "/LICENSE",
+    "/Makefile",
+    "/README.md",
+    "/SECURITY.md",
+    "/SUPPORT.md",
+    "/docs/**",
+    "/plugins/calcifier/**",
+    "/pyproject.toml",
+    "/scripts/**",
+    "/src/calcifier/**",
+    "/tests/**",
+    "/uv.lock",
+]
+exclude = [
+    "**/.claude/**",
+    "**/.hypothesis/**",
+    "**/.vivisect/**",
+    "**/__pycache__/**",
+    "**/*.pyc",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "UP", "S", "C90", "RET", "SIM", "TID252"]
+ignore = ["S603", "S607"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
+
+[tool.ruff.lint.pep8-naming]
+# ast.NodeVisitor dispatches on visit_<NodeType> method names.
+extend-ignore-names = ["visit_*"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    "ignore::EncodingWarning",
+    "error::EncodingWarning:calcifier(\\.|$)",
+]
+markers = [
+    "semantic_offline: semantic compiler tests that must not invoke providers or the network",
+]
+
+# CI measures statement and branch coverage across the installed package.
+[tool.coverage.run]
+source = ["src/calcifier"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "^\\s*\\.\\.\\.\\s*(?:#.*)?$",  # ellipsis-only Protocol method bodies, not tuple annotations
+]
+fail_under = 90
+
+# Makefile owns mutation scope and flags; pytest-gremlins reads CLI options.
+# Subprocess execution avoids macOS asyncio/fork failures. See CONTRIBUTING.md.
+[tool.pytest-gremlins]
+executor = "subprocess"

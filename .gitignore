@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+.calcifier-runtime/
+coverage/
+.gremlins_cache/
+.claude/
+.codex/
+.remember/
+.serena/
+.uv-cache/
+.vivisect/
+
+# Coverage artifacts
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Generated benchmark reports
+benchmarks/**/results/
+benchmarks/**/*-results/

@@ -1,0 +1,116 @@
+name: Mutation Testing
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Finish the costly report; keep only the newest pending commit in this group.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  gremlins:
+    name: Mutation shard (${{ matrix.operator }}, ${{ matrix.index }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Balance complete modules by observed per-operator mutant runtime.
+          # Boolean has the most work; comparison was a single multi-hour job.
+          - {operator: comparison, index: 0, count: 4}
+          - {operator: comparison, index: 1, count: 4}
+          - {operator: comparison, index: 2, count: 4}
+          - {operator: comparison, index: 3, count: 4}
+          - {operator: arithmetic, index: 0, count: 2}
+          - {operator: arithmetic, index: 1, count: 2}
+          - {operator: boolean, index: 0, count: 8}
+          - {operator: boolean, index: 1, count: 8}
+          - {operator: boolean, index: 2, count: 8}
+          - {operator: boolean, index: 3, count: 8}
+          - {operator: boolean, index: 4, count: 8}
+          - {operator: boolean, index: 5, count: 8}
+          - {operator: boolean, index: 6, count: 8}
+          - {operator: boolean, index: 7, count: 8}
+          - {operator: boundary, index: 0, count: 2}
+          - {operator: boundary, index: 1, count: 2}
+          - {operator: return, index: 0, count: 4}
+          - {operator: return, index: 1, count: 4}
+          - {operator: return, index: 2, count: 4}
+          - {operator: return, index: 3, count: 4}
+    env:
+      ANTHROPIC_API_KEY: ""
+      OPENAI_API_KEY: ""
+      GREMLIN_OPERATORS: ${{ matrix.operator }}
+      GREMLIN_CACHE: "1"
+      SHARD_INDEX: ${{ matrix.index }}
+      SHARD_COUNT: ${{ matrix.count }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+
+      # Reuse results only when the complete code and test inputs match. The
+      # plugin also hashes each target and its covering tests internally.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: .gremlins_cache
+          key: gremlins-${{ runner.os }}-py313-${{ matrix.operator }}-${{ matrix.index }}of${{ matrix.count }}-${{ hashFiles('uv.lock', 'pyproject.toml', 'Makefile', 'src/**', 'tests/**', 'plugins/**', 'scripts/mutation_shards.py', 'scripts/mutation_weights.json', '.github/workflows/mutation.yml') }}
+
+      - run: uv sync --all-groups --locked
+
+      - name: Mutate this operator's module partition
+        run: |
+          set -euo pipefail
+          MUTATION_RUN_TARGETS="$(python3 scripts/mutation_shards.py --operator "$GREMLIN_OPERATORS" --index "$SHARD_INDEX" --count "$SHARD_COUNT")"
+          export MUTATION_RUN_TARGETS
+          make mutate
+          test -s coverage/gremlins/gremlins.json
+
+      - name: Upload report
+        if: always() && hashFiles('coverage/gremlins/gremlins.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: gremlins-report-${{ matrix.operator }}-${{ matrix.index }}
+          path: coverage/gremlins/
+
+  mutation-threshold:
+    name: Mutation Testing (pytest-gremlins)
+    if: always()
+    needs: gremlins
+    runs-on: ubuntu-latest
+    steps:
+      # A missing shard would silently shrink each module's denominator.
+      - name: Require every mutation shard
+        env:
+          SHARDS: ${{ needs.gremlins.result }}
+        run: test "$SHARDS" = success
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          pattern: "gremlins-report-*"
+          path: coverage/shards
+
+      # Report-only until v0.1.0 ships: the per-module rate is printed but does not fail CI.
+      - name: Report the per-module kill rate
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mapfile -d '' reports < <(find coverage/shards -name gremlins.json -print0)
+          python3 scripts/mutation_threshold.py "${reports[@]}" --min 90

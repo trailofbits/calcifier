@@ -1,0 +1,50 @@
+name: Bug report
+description: Report reproducible incorrect behavior in Calcifier
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report vulnerabilities here. Follow SECURITY.md instead, and remove secrets or private trace data from public reports.
+  - type: input
+    id: version
+    attributes:
+      label: Calcifier version
+      placeholder: "0.1.0 or commit SHA"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the operating system, Python version, and relevant Claude/Codex/Coop versions.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide the commands and smallest non-sensitive inputs needed to reproduce the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include sanitized diagnostics or trace excerpts if useful.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Public-data confirmation
+      options:
+        - label: I removed credentials, private source, customer data, and sensitive trace content.
+          required: true

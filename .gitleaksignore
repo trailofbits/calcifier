@@ -1,0 +1,6 @@
+# SHA-256 digests of the frozen python-fastapi.md reference, verified against
+# that file's bytes. These exact historical findings are not credentials.
+bd24aad3b1a3b4de077bbfcd4f6ffb48db5eced0:benchmarks/compiler-contract/results/2026-09-26/reviews/code.json:generic-api-key:6
+bd24aad3b1a3b4de077bbfcd4f6ffb48db5eced0:benchmarks/compiler-contract/results/2026-09-26/published-file-hashes.json:generic-api-key:16
+20d7ffd080c75c208a7fffedc649ef0a1df4c5e8:benchmarks/compiler-contract/results/2026-09-26/reviews/code.json:generic-api-key:6
+20d7ffd080c75c208a7fffedc649ef0a1df4c5e8:benchmarks/compiler-contract/results/2026-09-26/published-file-hashes.json:generic-api-key:16

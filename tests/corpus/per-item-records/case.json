@@ -1,0 +1,25 @@
+{
+  "kind": "baseline",
+  "run": {
+    "inputs": {
+      "inventory": "inventory.txt",
+      "output_dir": "out"
+    },
+    "responses": {
+      "worker": [
+        {
+          "item_id": "a-1",
+          "description": "A folding chair."
+        },
+        {
+          "item_id": "b-2",
+          "description": "A desk lamp."
+        }
+      ]
+    },
+    "artifacts": [
+      "out/items/a-1.md",
+      "out/items/b-2.md"
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a focused improvement to Calcifier
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow or limitation should Calcifier address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the desired public contract and important alternatives.
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Trust and security implications
+      description: Note any effects on recipe trust, host execution, traces, subprocesses, or side effects.
+    validations:
+      required: true
