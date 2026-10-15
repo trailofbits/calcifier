@@ -36,12 +36,12 @@ so review generated code before granting trust.
 
 ## Try it
 
-Install from source until the first PyPI release. Requires Python 3.13+,
+Install from PyPI. Requires Python 3.13+,
 [uv](https://docs.astral.sh/uv/), and an authenticated Claude or Codex CLI
 (or a custom agent adapter).
 
 ```bash
-uv tool install git+https://github.com/trailofbits/calcifier.git
+uv tool install calcifier
 calcifier --version
 ```
 
