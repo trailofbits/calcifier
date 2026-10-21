@@ -31,12 +31,12 @@ does the work of the source SKILL.md below, and return it as a {draft_name}.
 {ir_contract}
 The compiler formats with destination Ruff, checks Ruff and ty against the installed Calcifier API,
 and dry-runs the recipe against stub agents. Return one complete module of at most 250 lines.
-Start with one agent session, then move concrete, repeatable operations into Python: supplied
-scripts, reference reads, searching, parsing, routing, and rendering. Leave understanding,
-interpretation, and uncertain decisions with agents. Keep connected reasoning phases in one
-session, preserving their order and checks; available roles do not require separate calls.
-Add sessions for independent work, required independent review, or different filesystem access,
-not for each prose clause or phase. A fully mechanical skill needs no agent calls.
+Start with one agent session, then move concrete, repeatable operations into Python:
+supplied scripts, reference reads, searches, parsing, routing, rendering, and independent checks.
+Leave understanding, interpretation, and uncertain decisions with agents. Keep connected reasoning
+phases in one session, preserving their order and checks; available roles do not require separate
+calls. Add sessions for independent work, required independent review, or different filesystem
+access, not for each prose clause or phase. A fully mechanical skill needs no agent calls.
 Reuse supplied programs and filesystem tools. {instruction_delivery_contract}
 Reading or parsing a reference does not complete its required understanding. Pass the complete
 read text, alongside mechanical observations, to the agent assigned that interpretation.
@@ -62,7 +62,7 @@ Import only from the Python standard library and `calcifier`. The installed reci
   Writing files requires `output_root=`; write paths are relative to that root.
 - Retain unchanged data in Python; ask agents for typed decisions and render complete answers.
   Reject or retry missing required results; never replace them with invented judgments or prose.
-  Render tables from fields; parse formatted answers independently of whitespace and alignment.
+  Render all required fields across groups; parse tables independently of whitespace and alignment.
   `parallel()` fans out independent work; shared writes follow it. Only async steps use `await`.
 - Use ordinary bounded loops for retries or iteration, retaining context between attempts.
   Declare the maximum attempts, budget all possible calls, and `fail()` after exhaustion.

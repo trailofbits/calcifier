@@ -242,6 +242,11 @@ def verify_artifact(
 
     Requires an active recipe step, including the recipe body. Records the
     verified path, hash and size; ordinary soft dry runs suppress filesystem checks.
+    Before announcing saved delivery, verify the trusted declared destination, never a
+    worker-provided path. Existence and a worker's saved/completed flag do not establish
+    complete content: parse the saved artifact and compare its records with the full
+    independently gathered inventory, or check a hash of independently expected bytes.
+    Preserve a usable alternate answer or fail delivery when these checks fail.
     """
     target = _output_path(path, writing=False)
     ctx = cast("_trace.RunContext", _trace.current())

@@ -69,6 +69,13 @@ as the prompt sends the bundle once. Its working directory defaults to the
 caller project, and target access still needs explicit paths. Include complete
 records in `prior_results` when the agent must select from or refer to them.
 
+Keep every source-required result field through rendering. Grouping records into
+categories changes their presentation, not which conditions, qualifications, or
+caller requirements the report retains. `model_dump()` preserves the complete
+structured record; a custom renderer must select and display all fields required
+by the source for every applicable record. Schema validation alone does not
+check the rendered report.
+
 For source files and manifests, use `prepare_context(..., files=selected_files,
 readable_roots=(project,))`. It resolves and validates the entire selection
 before reading any contents, rejecting files outside those roots, including
@@ -84,6 +91,16 @@ around arbitrary trusted Python reads.
 Declare an `output_root` for report files and use `ensure_directory`, `write_text`,
 or `write_json` beneath it. `verify_artifact` checks results without modifying
 them. `resource("references/example.md")` resolves a pinned packaged file.
+
+Before announcing saved delivery, call `verify_artifact` on the trusted declared
+destination. Treat a worker's path as opaque report text. The helper checks a
+regular, nonempty file and optionally its SHA-256; complete delivery also needs
+an independent content check. Parse the saved report and compare its inventory
+with the complete intended input set, including duplicates or omissions, or
+compare against independently expected bytes with `sha256=`. A saved flag or
+path string is insufficient. Failed verification must leave an explicit failure
+or an alternate usable answer. Prefer host-owned writes when the worker can
+return the report's structured content.
 
 Before a subprocess writes artifacts, preflight every destination, including
 intermediates, with `ensure_directory(..., output_files=("raw.json", "report.md"),
