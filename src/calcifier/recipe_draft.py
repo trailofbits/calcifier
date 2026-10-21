@@ -30,6 +30,7 @@ class RecipeDraft:
 
     version: Literal["1"]
     source: str
+    suitability_note: str | None = None
 
 
 # This is intentionally explicit. Adding Python syntax to generated recipes is
@@ -135,6 +136,11 @@ def parse_recipe_draft(text: str, *, python_version: str | None = None) -> str:
     Invalid, oversized, or unsupported drafts raise RecipeDraftError. Never
     re-render the AST: that would collapse deliberately wrapped string literals.
     """
+    return decode_recipe_draft(text, python_version=python_version).source
+
+
+def decode_recipe_draft(text: str, *, python_version: str | None = None) -> RecipeDraft:
+    """Validate source and retain the compiler's optional advisory assessment."""
     if len(text.encode()) > _MAX_DRAFT_BYTES:
         raise RecipeDraftError(f"recipe draft exceeds {_MAX_DRAFT_BYTES} bytes")
     try:
@@ -158,7 +164,11 @@ def parse_recipe_draft(text: str, *, python_version: str | None = None) -> str:
         raise RecipeDraftError(f"invalid or incomplete recipe draft: {exc}") from exc
     check_recipe_syntax(module)
     _reject_type_check_suppression(draft.source, module)
-    return draft.source if draft.source.endswith("\n") else draft.source + "\n"
+    return RecipeDraft(
+        version=draft.version,
+        source=draft.source if draft.source.endswith("\n") else draft.source + "\n",
+        suitability_note=(draft.suitability_note or "").strip() or None,
+    )
 
 
 # ty's configuration can switch off type-ignore comments, but not its own directive.
@@ -208,6 +218,11 @@ def recipe_draft_prompt_contract() -> str:
     kinds = ", ".join(sorted(_ALLOWED_NODE_KINDS))
     return (
         'Return one RecipeDraft JSON object: {"version":"1","source":"<complete Python module>"}. '
+        "The optional suitability_note is null unless little meaningful executable work can be "
+        "extracted, for example from ongoing behavioral guidance. In that case explain why owner "
+        "review is needed and what remains agent-owned; preserve the guidance without inventing a "
+        "procedure. This is an advisory assessment, not a pass/fail classifier or a measure of "
+        "agent-call counts. Compiled source still goes through all checks. "
         "Put the complete, nonempty module in the source string of your FINAL structured response. "
         "Do not return an AST JSON tree, Markdown fences, a patch, or a file reference. "
         "Do not run Python-to-AST conversion commands, shell commands, or write temporary files. "

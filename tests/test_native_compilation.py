@@ -22,7 +22,10 @@ def test_native_calcify_distinguishes_accepted_source_from_retained_baseline(
     tmp_path, monkeypatch, oversized
 ):
     skill = write_skill(tmp_path / "neutral", SKILL)
-    responses = [draft_response(_GOOD_RECIPE)]
+    assessment = "Little standalone work is extracted; owner review is needed."
+    response = json.loads(draft_response(_GOOD_RECIPE))
+    response["suitability_note"] = assessment
+    responses = [json.dumps(response)]
     (tmp_path / "responses.json").write_text(json.dumps(responses), encoding="utf-8")
     script = tmp_path / "native_provider.py"
     script.write_text(
@@ -77,7 +80,12 @@ print(json.dumps({{'type': 'turn.completed', 'usage': {{'input_tokens': 11, 'out
     assert payload["outcome"] == ("baseline_retained" if oversized else "compiled")
     assert payload["model_calls"] == 1
     calls = json.loads((tmp_path / "calls.json").read_text(encoding="utf-8"))
-    assert set(calls[0]["properties"]) == {"version", "source"}
+    assert set(calls[0]["properties"]) == {"version", "source", "suitability_note"}
+    assert calls[0]["properties"]["suitability_note"]["anyOf"] == [
+        {"type": "string"},
+        {"type": "null"},
+    ]
+    assert payload["suitability_note"] == (None if oversized else assessment)
     transports = [event for event in payload["events"] if event["phase"] == "native_transport"]
     diagnostics = json.loads(transports[0]["detail"])
     assert diagnostics["total_bytes"] > 8 * 1024 * 1024

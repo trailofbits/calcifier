@@ -37,7 +37,7 @@ from .gate import verify_source
 from .metadata import attach_script_metadata, split_metadata
 from .outputs import strict_schema_for
 from .prompts import build_prompt
-from .recipe_draft import RecipeDraft, RecipeDraftError, parse_recipe_draft
+from .recipe_draft import RecipeDraft, RecipeDraftError, decode_recipe_draft
 from .skill_frontmatter import AllowedToolsError, declared_allowed_tools
 from .skill_package import ResourceEntry
 from .source_quality import (
@@ -152,6 +152,7 @@ class SourceCompileContext:
 class CompiledSource:
     source: str
     dry_run: DryRunResult | None = None
+    suitability_note: str | None = None
 
 
 def compile_source(context: SourceCompileContext) -> CompiledSource:
@@ -210,8 +211,11 @@ def compile_source(context: SourceCompileContext) -> CompiledSource:
                         )
                     source = _generate_source(context, prompt=prompt, filesystem=filesystem)
                     check_compiler_deadline(deadline)
+                    context.activity.suitability_note = source.suitability_note
                     context.activity.outcome = "source_accepted"
-                    context.activity.record_event("compiler", "accepted")
+                    context.activity.record_event(
+                        "compiler", "accepted", detail=source.suitability_note
+                    )
                     return source
             except AgentError as exc:
                 raise CalcifyError(
@@ -458,7 +462,7 @@ def _prepare_recipe_candidate(
 ) -> CompiledSource:
     """Parse the complete candidate, then validate its final source."""
     try:
-        source = parse_recipe_draft(
+        decoded = decode_recipe_draft(
             _normalize_uniformly_indented_recipe_draft(
                 draft, python_version=context.python_version
             ),
@@ -466,7 +470,10 @@ def _prepare_recipe_candidate(
         )
     except RecipeDraftError as exc:
         raise CalcifyError(f"invalid RecipeDraft: {exc}") from exc
-    return _prepare_source_candidate(source, context, review_command_gaps=review_command_gaps)
+    candidate = _prepare_source_candidate(
+        decoded.source, context, review_command_gaps=review_command_gaps
+    )
+    return replace(candidate, suitability_note=decoded.suitability_note)
 
 
 def _normalize_uniformly_indented_recipe_draft(

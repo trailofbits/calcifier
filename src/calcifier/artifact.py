@@ -85,6 +85,7 @@ class PreparedArtifact:
     source: str
     outcome: str = "compiled"
     dry_run: DryRunResult | None = None
+    suitability_note: str | None = None
 
 
 def prepare_artifact(  # noqa: C901 - baseline preparation and compiler improvement share inputs
@@ -215,7 +216,9 @@ def prepare_artifact(  # noqa: C901 - baseline preparation and compiler improvem
             finalize_source=finalize_source,
         )
         compiled = compile_source(context)
-        result = PreparedArtifact(target, compiled.source, "compiled", compiled.dry_run)
+        result = PreparedArtifact(
+            target, compiled.source, "compiled", compiled.dry_run, compiled.suitability_note
+        )
         deadline.remaining()
     except CalcifyError as exc:
         if baseline is None:
@@ -229,6 +232,7 @@ def prepare_artifact(  # noqa: C901 - baseline preparation and compiler improvem
             stage_compiler_resources(Path(directory), skill_path, skill_text, tuple(resources))
         activity.outcome = baseline.outcome
         activity.retained_reason = str(exc)
+        activity.suitability_note = None
         activity.dry_run = baseline.dry_run
         activity.record_event("baseline", "retained", detail=str(exc))
         logger.warning("Compiler improvement rejected; retaining baseline: %s", exc)

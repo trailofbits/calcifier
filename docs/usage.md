@@ -75,6 +75,23 @@ A failed optimization retains a runnable baseline with outcome
 preserving that fallback. If any `build-graph` node falls back, all nodes are
 published as baselines. See [budgets and outcomes](architecture.md#budgets-and-outcomes).
 
+The compiler can also report `suitability: owner review required` with an
+explanation when little meaningful executable work can be extracted. This is
+the compiler's advisory assessment, separate from syntax, runtime validation,
+and the `compiled`/`baseline_retained` outcome. The note appears in CLI output
+and the optional compiler trace as `suitability_note`; no note means suitability
+was not assessed, not that usefulness was verified. Owners make the final choice.
+`--require-compiled` checks the compilation outcome and does not certify suitability.
+Graph builds report each affected node through a warning.
+
+A procedure that enumerates inputs, applies a supplied checker, and formats its
+results has concrete work for Python to perform. Guidance such as “explain
+tradeoffs throughout development” may have no standalone task to extract.
+Preserve that guidance for the agent; do not invent a sequence or deliverable
+to make it look executable. A single agent session can still be useful when
+Python independently gathers inputs and verifies required results. Agent-call
+counts alone do not establish value.
+
 `--compiler-trace PATH` saves attempt diagnostics and telemetry; `--verbose`
 prints progress to stderr. The CLI reports calls, usage, time, and the recipe's
 inputs, steps, and budget. Unreported usage is `null`, not zero.

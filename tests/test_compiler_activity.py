@@ -62,6 +62,7 @@ def test_compiler_activity_renders_exact_telemetry(
     )
     assert compiler_activity_payload(activity) == {
         "outcome": "in_progress",
+        "suitability_note": None,
         "model_calls": 3,
         "max_model_calls": 8,
         "model": rendered_model,

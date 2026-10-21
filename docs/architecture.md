@@ -82,6 +82,13 @@ fallback but exits nonzero. If one graph node falls back, the whole graph is
 published as baselines. Neither compilation nor baseline recovery establishes
 instruction fidelity, speed, or answer quality; those need live acceptance.
 
+The compiler may attach a `suitability_note` to its draft when it finds little
+executable work to extract. The accepted candidate's note reaches the prepared
+artifact, CLI, and compiler trace independently of the mechanical outcome.
+It cannot bypass source checks or the whole dry run, and a rejected candidate's
+assessment cannot become the final result. This is a model assessment for owner
+review, not a source classifier or a usefulness guarantee.
+
 ### What the gate rejects
 
 The gate rejects behavioral defects: syntax and undefined names, ty rules that
