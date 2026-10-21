@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -36,7 +37,7 @@ class CommandResult:
 
 
 def _output_path(  # noqa: C901 - write boundaries plus compiler scratch redirection
-    path: str | Path, *, writing: bool = True
+    path: str | Path, *, writing: bool = True, redirect_scratch: bool = True
 ) -> Path:
     ctx = _trace.current()
     if ctx is None or ctx.output_root is None:
@@ -59,18 +60,36 @@ def _output_path(  # noqa: C901 - write boundaries plus compiler scratch redirec
     if not resolved.is_relative_to(root):
         raise RecipeError(f"artifact path escapes declared output root: {path!s}")
     scratch = ctx.hooks.scratch_output_root
-    if ctx.dry_run is DryRunMode.SOFT and scratch is not None and not root.is_relative_to(scratch):
+    if (
+        redirect_scratch
+        and ctx.dry_run is DryRunMode.SOFT
+        and scratch is not None
+        and not root.is_relative_to(scratch)
+    ):
         resolved = scratch.joinpath("absolute-output", *root.parts[1:], resolved.relative_to(root))
     return resolved
 
 
-def ensure_directory(path: str | Path = ".") -> Path:
+def ensure_directory(
+    path: str | Path = ".",
+    *,
+    output_files: Iterable[str | Path] = (),
+    exclude_roots: Iterable[str | Path] = (),
+    overwrite: bool = False,
+) -> Path:
     """Create a directory inside the recipe output root and return its path.
 
     Requires an active recipe step (the recipe body is also traced as a step).
     Parallel workers cannot mutate shared state; dry-run policy applies.
+    Before any mkdir or subprocess, pass the complete planned ``output_files`` set,
+    relative to this directory, including intermediates. Preflight confines all paths,
+    rejects symlinked files and collisions, and excludes resolved ``exclude_roots``
+    such as an audited project. ``overwrite=True`` permits existing regular files only
+    when the run's output policy permits replacement; --output-dir protection still applies.
+    This validates destinations before external writes; it does not sandbox the subprocess.
     """
     target = _output_path(path)
+    _preflight_outputs(path, tuple(output_files), tuple(exclude_roots), overwrite=overwrite)
     ctx = cast("_trace.RunContext", _trace.current())
     effect = record_side_effect(
         "file_write",
@@ -89,6 +108,49 @@ def ensure_directory(path: str | Path = ".") -> Path:
     effect.completed = ctx.dry_run is DryRunMode.OFF
     _trace.checkpoint("side-effect-complete")
     return target
+
+
+def _preflight_outputs(
+    path: str | Path,
+    output_files: tuple[str | Path, ...],
+    exclude_roots: tuple[str | Path, ...],
+    *,
+    overwrite: bool,
+) -> None:
+    if not output_files and not exclude_roots:
+        return
+    directory = _output_path(path, redirect_scratch=False)
+    excluded = tuple(Path(root).resolve() for root in exclude_roots)
+    candidates = tuple(directory / PathSyntax.inspect(file).native for file in output_files)
+    resolved = tuple(_output_path(file, redirect_scratch=False) for file in candidates)
+    if any(target.is_relative_to(root) for target in (directory, *resolved) for root in excluded):
+        raise RecipeError("planned output is inside an excluded root")
+    if directory.exists() and not directory.is_dir():
+        raise RecipeError(f"artifact directory is not a directory: {directory}")
+    for candidate, target in zip(candidates, resolved, strict=True):
+        if target == directory or not target.is_relative_to(directory):
+            raise RecipeError(f"planned output escapes the selected directory: {candidate}")
+        _preflight_output_file(candidate, overwrite=overwrite)
+    if any(a != b and b.is_relative_to(a) for a in resolved for b in resolved):
+        raise RecipeError("a planned output file is also another output's parent directory")
+
+
+def _preflight_output_file(path: Path, *, overwrite: bool) -> None:
+    ctx = cast("_trace.RunContext", _trace.current())
+    if path.is_symlink():
+        raise RecipeError(f"planned output is a symlink: {path}")
+    # Compiler scratch redirection must not hide a collision at the actual destination.
+    for target in {_output_path(path, redirect_scratch=False), _output_path(path)}:
+        if target.exists():
+            if not target.is_file():
+                raise RecipeError(f"planned output is not a regular file: {path}")
+            protected = (
+                ctx.output_writes.protect_existing and target not in ctx.output_writes.created
+            )
+            if not overwrite or protected:
+                raise RecipeError(f"refusing to replace an existing planned output: {path}")
+        if any(parent.exists() and not parent.is_dir() for parent in target.parents):
+            raise RecipeError(f"planned output has a non-directory parent: {path}")
 
 
 def _suppress_output(ctx: _trace.RunContext, target: Path) -> bool:

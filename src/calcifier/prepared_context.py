@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -41,6 +42,8 @@ def prepare_context(
     instructions: str = "",
     prior_results: str = "",
     byte_budget: int = 65536,
+    files: Iterable[str | Path] = (),
+    readable_roots: Iterable[str | Path] = (),
 ) -> PreparedContext:
     """Save the complete task in per-run scratch storage; the budget limits embedding only.
 
@@ -51,6 +54,11 @@ def prepare_context(
     ``prior_results=index.model_dump_json()``. Pass the result as
     ``agent(..., context=context)``; the bundle is readable alongside the caller's
     working directory. The runtime removes it when the recipe run ends.
+    Gather target files and manifests with ``files=`` and explicit ``readable_roots=``.
+    All selected paths must resolve to regular files beneath an authorized resolved root
+    before any contents are read; escaping symlinks are rejected. Explicit external inputs
+    and resource() snapshots remain supported by including their roots or exact file paths.
+    UTF-8 content is saved completely, retaining LF/CRLF, without changing the embedding limit.
     """
     if type(byte_budget) is not int or byte_budget < 1024:
         raise ValueError("context embedding budget must be an integer of at least 1024 bytes")
@@ -60,6 +68,7 @@ def prepare_context(
     directory = _DIRECTORY.get()
     if directory is None:
         raise RecipeError("prepare_context() requires an active recipe run")
+    task_text += _context_files(files, readable_roots)
     data = task_text.encode("utf-8")
     root = directory / sha256_hex(data)
     with tempfile.TemporaryDirectory(prefix=".bundle-", dir=directory) as temporary:
@@ -80,3 +89,27 @@ def prepare_context(
     if len((prompt + task_text).encode()) <= byte_budget:
         prompt += task_text
     return PreparedContext(prompt, str(root), byte_budget)
+
+
+def _context_files(files: Iterable[str | Path], readable_roots: Iterable[str | Path]) -> str:
+    """Validate the complete selection before reading any file into the bundle."""
+    selected = tuple(Path(path) for path in files)
+    if not selected:
+        return ""
+    try:
+        roots = tuple(Path(root).resolve(strict=True) for root in readable_roots)
+        if not roots:
+            raise RecipeError("prepared-context files require explicit readable_roots")
+        resolved = tuple(path.resolve(strict=True) for path in selected)
+        for source, target in zip(selected, resolved, strict=True):
+            if not any(target.is_relative_to(root) for root in roots):
+                raise RecipeError(f"prepared-context file escapes readable_roots: {source}")
+            if not target.is_file():
+                raise RecipeError(f"prepared-context input is not a regular file: {source}")
+        records = [
+            {"path": str(source), "text": target.read_bytes().decode("utf-8")}
+            for source, target in zip(selected, resolved, strict=True)
+        ]
+    except (OSError, UnicodeError) as exc:
+        raise RecipeError(f"cannot read prepared-context files: {exc}") from exc
+    return "\nFiles:\n" + json.dumps(records, ensure_ascii=False) + "\n"
