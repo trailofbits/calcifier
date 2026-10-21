@@ -19,6 +19,7 @@ _NAMES = {
     "parallel": "calcifier.parallel",
     "write_text": "calcifier.write_text",
     "write_json": "calcifier.write_json",
+    "ensure_directory": "calcifier.ensure_directory",
     "prepare_context": "calcifier.prepare_context",
     "PreparedContext": "calcifier.PreparedContext",
     "partial": "functools.partial",
@@ -58,6 +59,40 @@ def run(root):
     return run_command(["cat", str(root)], timeout_seconds=1)
 """)
     assert bool(errors) == model_path
+
+
+@pytest.mark.parametrize("keyword", ["files", "readable_roots"])
+def test_prepared_context_file_reads_require_trusted_paths(keyword):
+    source = f"""
+def run(root):
+    answer = agent("worker", "answer", working_directory=root)
+    return prepare_context("review", {keyword}=(answer,))
+"""
+    findings = _errors(source)
+    assert len(findings) == 1
+    assert "a prepared-context file read" in findings[0].actual
+
+
+@pytest.mark.parametrize("keyword", ["output_files", "exclude_roots"])
+def test_output_preflight_requires_trusted_paths(keyword):
+    findings = _errors(f"""
+def run(root):
+    answer = agent("worker", "answer", working_directory=root)
+    return ensure_directory(".", {keyword}=(answer,))
+""")
+    assert len(findings) == 1
+    assert "an output preflight path" in findings[0].actual
+
+
+def test_model_text_remains_usable_as_context_data_with_trusted_file_paths():
+    assert (
+        _errors("""
+def run(root, paths):
+    answer = agent("worker", "answer", working_directory=root)
+    return prepare_context("review", prior_results=answer, files=paths, readable_roots=(root,))
+""")
+        == []
+    )
 
 
 @pytest.mark.parametrize("field", ["directory", "prompt"])

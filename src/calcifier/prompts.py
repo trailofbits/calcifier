@@ -90,8 +90,8 @@ Import only from the Python standard library and `calcifier`. The installed reci
 - Batch complete reference reads for already selected candidates. Preserve source-stated
   ordering and limits; on-demand reads need not be one file per call unless explicitly stated.
 ## Effects and security
-- Read files with `Path.read_text(encoding="utf-8")` or `Path.read_bytes()`;
-  `open()` is not available. Write artifacts with `write_text()`, `write_json()`,
+- Gather target files with `prepare_context(files=..., readable_roots=...)`; use UTF-8 Path reads
+  only for other authorized inputs. `open()` is not available. Use `write_text()`, `write_json()`,
   or `ensure_directory()` under `output_root`. Change the user's project with a supplied program
   via `run_command()` or agent `writable_paths`. Never mutate files directly (`Path.write_text()`,
   `Path.replace()`, `os`, `shutil`, `subprocess`). Ordinary string methods are allowed.

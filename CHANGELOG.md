@@ -15,6 +15,13 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
 
 ### Fixed
 
+- Prepared context can gather source files and manifests with resolved readable
+  roots, rejecting an escaping selection before reading any contents while
+  retaining authorized resources, external inputs, and LF/CRLF content (#9).
+- Artifact directory creation can preflight a complete subprocess output set,
+  rejecting collisions, symlinked files, and excluded project roots before any
+  mkdir or command launch. Explicit replacement respects output override
+  protection (#10).
 - Command authoring guidance accounts for implicit target builds and executable
   configuration, requiring opt-in and isolation for build-capable analysis (#11).
 - Optional command workflows can distinguish launch failures and local timeouts

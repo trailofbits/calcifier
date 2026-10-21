@@ -69,11 +69,34 @@ as the prompt sends the bundle once. Its working directory defaults to the
 caller project, and target access still needs explicit paths. Include complete
 records in `prior_results` when the agent must select from or refer to them.
 
+For source files and manifests, use `prepare_context(..., files=selected_files,
+readable_roots=(project,))`. It resolves and validates the entire selection
+before reading any contents, rejecting files outside those roots, including
+escaping symlinks. Internal symlinks remain valid. Include an external input's
+root or exact path explicitly when the workflow authorizes it; pinned
+`resource()` paths can be authorized the same way. Complete UTF-8 contents are
+saved with their original line endings; the embedding budget does not truncate
+the saved bundle. This helper enforces the declared selection, not a sandbox
+around arbitrary trusted Python reads.
+
 ## Effects
 
 Declare an `output_root` for report files and use `ensure_directory`, `write_text`,
 or `write_json` beneath it. `verify_artifact` checks results without modifying
 them. `resource("references/example.md")` resolves a pinned packaged file.
+
+Before a subprocess writes artifacts, preflight every destination, including
+intermediates, with `ensure_directory(..., output_files=("raw.json", "report.md"),
+exclude_roots=(project,))`. File names are relative to the selected directory.
+The complete set is checked before directory creation: destinations must remain
+within that directory and the declared output root, avoid excluded roots and
+symlinked files, and have no existing files or conflicting parents. Use
+`overwrite=True` only when replacement is intended; it cannot bypass an
+explicit output-directory override's existing-file protection. Calls without
+`output_files` retain the ordinary directory helper's behavior. Preflight does
+not sandbox a subprocess or protect against concurrent filesystem changes;
+the supplied program must use those checked destinations. Verification after a
+write checks the result and cannot undo an earlier overwrite.
 
 Project modifications use a supplied program through `run_command()` or agent
 `writable_paths`. Direct `Path.write_text()` calls are not admitted. Commands run

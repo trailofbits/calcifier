@@ -595,6 +595,16 @@ def _tainted_sink(call: ast.Call, flow: _Flow, names: set[str]) -> str | None:
         if any(node is not None and flow.tainted(node, names) for node in (argv, cwd)):
             return "a command"
         return None
+    if target == "calcifier.prepare_context" and any(
+        name in {"files", "readable_roots"} and flow.tainted(value, names)
+        for name, value in keywords.items()
+    ):
+        return "a prepared-context file read"
+    if target == "calcifier.ensure_directory" and any(
+        name in {"output_files", "exclude_roots"} and flow.tainted(value, names)
+        for name, value in keywords.items()
+    ):
+        return "an output preflight path"
     if target in _TOOLS | {"calcifier.agent"} and any(
         name in _FILESYSTEM_KEYWORDS and flow.tainted(value, names)
         for name, value in keywords.items()
