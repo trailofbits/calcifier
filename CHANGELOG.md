@@ -18,6 +18,15 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
 
 ### Fixed
 
+- Compiler scratch redirection preserves helper-returned paths when chained
+  through writes and verification under absolute output roots.
+- Predeclared subprocess outputs remain absent and explicitly unverified after
+  compiler command suppression, so recipes can retain mandatory artifact
+  checks. Incorrect paths and materialized content failures remain errors.
+- Stateful-import guidance requires supported accumulation behavior and a final
+  check against all input evidence; neutral old/new dependency regressions
+  cover replace-by-default imports and lost evidence despite success counters
+  (#15).
 - Installed generation contracts require source-required fields to survive
   grouped rendering and saved delivery to use a trusted destination plus
   independent content/inventory verification (#12, #14).

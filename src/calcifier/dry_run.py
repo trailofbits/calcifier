@@ -265,6 +265,7 @@ def _run_in_workspace(
         return DryRunResult("unverified", None, "a required recipe input cannot be synthesized")
     missing_roots = _missing_default_roots(recipe, workspace)
     gaps: list[tuple[str | None, str]] = []
+    artifact_gaps: list[tuple[str | None, str]] = []
 
     def command_gap(argv: list[str], cwd: str | Path, error: str) -> bool:
         if not _command_input_gap(argv, cwd, workspace, (*missing_roots, text_root)):
@@ -273,14 +274,39 @@ def _run_in_workspace(
         gaps.append((frame.name if frame else None, error))
         return True
 
-    hooks = replace(hooks, scratch_output_root=workspace.resolve(), command_gap=command_gap)
+    def artifact_gap(error: str) -> None:
+        frame = current_frame()
+        artifact_gaps.append((frame.name if frame else None, error))
+
+    hooks = replace(
+        hooks,
+        scratch_output_root=workspace.resolve(),
+        command_gap=command_gap,
+        artifact_gap=artifact_gap,
+    )
     outcome = _outcome(
         _execute(recipe, inputs, hooks, agent_capabilities), missing_input_roots=missing_roots
     )
-    if gaps and outcome.status != "failed":
-        errors = [error for _, error in gaps] + ([outcome.error] if outcome.error else [])
-        return DryRunResult("unverified", gaps[0][0], "; ".join(errors), outcome.writes, True)
-    return outcome
+    return _with_gaps(outcome, gaps, artifact_gaps)
+
+
+def _with_gaps(
+    outcome: DryRunResult,
+    command_gaps: list[tuple[str | None, str]],
+    artifact_gaps: list[tuple[str | None, str]],
+) -> DryRunResult:
+    """Keep observed gaps even when caught, without hiding deterministic failures."""
+    combined = [*command_gaps, *artifact_gaps]
+    if not combined or outcome.status == "failed":
+        return outcome
+    errors = [error for _, error in combined] + ([outcome.error] if outcome.error else [])
+    return DryRunResult(
+        "unverified",
+        combined[0][0],
+        "; ".join(dict.fromkeys(errors)),
+        outcome.writes,
+        bool(command_gaps),
+    )
 
 
 def _command_input_gap(
@@ -419,7 +445,11 @@ def _outcome(run: RecipeRun, *, missing_input_roots: tuple[Path, ...] = ()) -> D
         return DryRunResult("passed", writes=writes)
     error = run.error or ""
     step, located = _failing_step(run.records)
-    if STUB_REJECTED in error or run.exception is None:
+    if (
+        STUB_REJECTED in error
+        or run.exception is None
+        or run.error_type == "UnmaterializedArtifactError"
+    ):
         return DryRunResult("unverified", step, error, writes)
     detail = located or error
     location = run.exception.location

@@ -32,3 +32,7 @@ class RecipeError(CalcifierError):
 
 class RecipeFailure(CalcifierError):  # noqa: N818 - public surface; not just an "Error"
     """Raised by ``fail()`` to abort a recipe with an explicit reason."""
+
+
+class UnmaterializedArtifactError(RecipeError):
+    """A declared subprocess output is unavailable after compiler dry-run suppression."""

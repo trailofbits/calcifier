@@ -62,6 +62,13 @@ a gap and return synthesized output so downstream steps still run. Other
 nonzero exits and later deterministic failures reject the candidate. Command
 input gaps receive one advisory repair when the call budget permits.
 
+Preflighted `output_files` from `ensure_directory` identify planned external
+artifacts. After a mutating command is suppressed, an absent planned file at
+`verify_artifact` is an unverified frontier, with downstream content checks
+explicitly unverified. This never synthesizes a file or records successful
+verification. Existing recipes without such plans retain their validation;
+incorrect paths and materialized content failures still reject the candidate.
+
 ### Budgets and outcomes
 
 File compilation defaults to five calls when a runnable baseline exists and

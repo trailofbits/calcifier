@@ -136,6 +136,23 @@ commands are suppressed and their typed results synthesized. An unavailable
 synthetic input can leave the dry run unverified. Synthesis neither verifies the
 command nor creates its files. See [effect boundaries](architecture.md#effects-and-provider-boundaries).
 
+When `ensure_directory(output_files=...)` predeclares a subprocess's outputs,
+the compiler tracks those paths through suppression. If `verify_artifact` then
+reaches a missing declared file, it reports an unverified coverage gap: no file
+is fabricated, and content checks beyond that point remain unverified. An
+undeclared or incorrect path, a missing output without a suppressed command,
+an empty materialized file, or a hash mismatch remains a failure. Actual runtime
+execution always requires the output file.
+Caught verification gaps remain unverified even when an alternate answer is
+produced; a later deterministic failure still fails the dry run.
+
+For repeated stateful imports, inspect the supported dependency contract.
+Aggregate compatible inputs into one import when each call replaces previous
+state, or use an append API only when the installed supported release provides
+it. Verify the final combined artifact against all input evidence. Per-input
+success counters describe those operations and cannot establish that earlier
+evidence survived later writes.
+
 An unavailable executable or another process launch failure raises `RecipeError`
 with `command_failure == "launch"`; a command's local timeout sets it to
 `"timeout"`. Optional tools can fall back by catching `RecipeError` and checking
