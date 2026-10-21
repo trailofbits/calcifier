@@ -8,12 +8,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, get_args, get_type_hints
 
 from . import trace as trace_module
-from .agent_config import BUILTIN_AGENTS, ROLE_RE
+from .agent_config import AGENT_CAPABILITIES, BUILTIN_AGENTS, ROLE_RE
 from .filesystem_contract import AgentError, FilesystemContract, _filesystem_prompt
 from .validation import bounded_timeout
 
 if TYPE_CHECKING:
     from typing_extensions import TypeForm
+
+    from .agent_events import AgentProvider
 
 # -- user-facing Agent --------------------------------------------------------
 
@@ -41,6 +43,7 @@ class Agent:
         working_directory: str | Path | None = None,
         readable_paths: tuple[str | Path, ...] = (),
         writable_paths: tuple[str | Path, ...] = (),
+        required_capabilities: tuple[str, ...] = (),
         output: Any | None = None,
         timeout: float | None = None,
         context: Any | None = None,
@@ -78,6 +81,7 @@ class Agent:
             writable_paths,
             resource_root=ctx.resource_root,
         )
+        _require_agent_capabilities(provider, required_capabilities, filesystem)
         rendered = _filesystem_prompt(filesystem, rendered, host_delivery=host_delivery)
         effective_timeout = provider.effective_timeout(timeout)
         if effective_timeout is None:
@@ -103,6 +107,22 @@ class Agent:
                 timeout=effective_timeout,
                 filesystem=filesystem,
             )
+
+
+def _require_agent_capabilities(
+    provider: AgentProvider, required_capabilities: tuple[str, ...], filesystem: FilesystemContract
+) -> None:
+    required = set(required_capabilities)
+    if unknown := required - AGENT_CAPABILITIES:
+        raise AgentError(f"unknown required agent capabilities: {sorted(unknown)}")
+    if missing := required - set(provider.capabilities or ()):
+        raise AgentError(
+            f"agent role {provider.name!r} does not declare required capabilities: "
+            f"{sorted(missing)}; "
+            f"declared capabilities: {provider.capabilities}"
+        )
+    if "write" in required and not filesystem.writable_paths:
+        raise AgentError("required agent write capability needs declared writable_paths")
 
 
 def _require_agent_answer_type(annotation: Any, seen: set[int] | None = None) -> None:
@@ -193,6 +213,7 @@ def agent[T = Any](
     working_directory: str | Path | None = None,
     readable_paths: tuple[str | Path, ...] = (),
     writable_paths: tuple[str | Path, ...] = (),
+    required_capabilities: tuple[str, ...] = (),
     output: TypeForm[T] | None = None,
     timeout: float | None = None,
     context: Any | None = None,
@@ -210,6 +231,13 @@ def agent[T = Any](
     Recipes run git with run_command(). One signature,
     rather than overloads, lets a type checker name the exact argument that is
     wrong.
+    Use ``required_capabilities=("commands",)`` or ``("research",)`` for worker-owned
+    execution or online research. The configured provider must declare support;
+    missing or unknown support fails before invocation. A write requirement also
+    needs writable_paths. These are the agent's tools, not the host tool providers;
+    host tool configuration does not grant tools to agents. Prefer host run_command()
+    for repeatable commands. If mandatory worker research or execution has no supported
+    route, report the required provider configuration instead of claiming completion.
     """
     if ROLE_RE.fullmatch(role) is None:
         raise AgentError(f"invalid agent role name: {role!r}")
@@ -220,6 +248,7 @@ def agent[T = Any](
         working_directory=working_directory,
         readable_paths=readable_paths,
         writable_paths=writable_paths,
+        required_capabilities=required_capabilities,
         output=output,
         timeout=timeout,
         context=context,

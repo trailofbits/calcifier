@@ -237,6 +237,10 @@ def run_command[T = CommandResult](  # noqa: C901 - effect lifecycle, simulation
     Shared deadline exhaustion raises BudgetExceeded and must stop the workflow.
     Retain the complete environment-specific argv prefix for fallback commands;
     an import probe in one environment does not establish bare executable availability.
+    Classify effective behavior: analysis wrappers that compile targets or load executable
+    project configuration are mutating. Require explicit recipe input opt-in before target
+    builds, and run them in an isolated environment; mutating=True does not isolate a process.
+    Preserve a non-building/manual route when the source workflow permits one.
     """
     ctx = _command_context(mutating)
     if not argv or any(not isinstance(part, str) or not part for part in argv):

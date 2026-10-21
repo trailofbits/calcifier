@@ -622,8 +622,8 @@ def test_native_entry_point_preserves_optional_resource_manifest(
     )
     calls = []
 
-    def run(*args):
-        calls.append(args)
+    def run(*args, **kwargs):
+        calls.append((args, kwargs))
         return DryRunResult("passed", writes=("report.md",))
 
     monkeypatch.setattr(dry_run, "_run", run)
@@ -636,7 +636,7 @@ def test_native_entry_point_preserves_optional_resource_manifest(
         arguments.append(str(manifest))
         entries = (ResourceEntry("references/雪.md", "a" * 64, 17),)
     assert dry_run.main(arguments) == 0
-    assert calls == [(candidate, skill, destination, entries)]
+    assert calls == [((candidate, skill, destination, entries), {"agent_capabilities": None})]
     assert json.loads(capsys.readouterr().out) == {
         "status": "passed",
         "step": None,

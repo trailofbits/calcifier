@@ -61,6 +61,38 @@ Recipe Python, host commands, and tool providers still run with host permissions
 Custom adapters must enforce the filesystem contract themselves. VM isolation
 is not implemented.
 
+### Worker tool capabilities
+
+Generation and repair receive each configured role's tool support separately
+from the recipe's host tool declarations. Built-in Claude supports `read` and
+scoped `write`, while built-in Codex also supports `commands`. Neither built-in
+route promises online `research`. Writes still require `writable_paths` on the
+call; a capability declaration does not change filesystem permissions.
+
+For a custom command adapter, declare the tools it actually implements:
+
+```json
+{
+  "target": {"command": ["research-adapter"]},
+  "runtime": {"kind": "host"},
+  "timeout_seconds": 900,
+  "capabilities": ["read", "research"]
+}
+```
+
+The supported capability names are `read`, `write`, `commands`, and `research`.
+An omitted declaration means unknown support. Built-in capability declarations
+cannot be overridden in configuration. Custom declarations are adapter
+contracts, not enforcement or a grant of additional tools.
+
+A recipe can require worker-owned work with
+`agent(..., required_capabilities=("research",))`. Missing or unknown support
+fails before invoking or charging the worker. Compiler dry runs use the actual
+configured declarations on their schema stubs, so a requirement mismatch
+reaches repair instead of receiving a synthetic success. Host `--tool-config`
+providers do not grant tools to workers. Put repeatable commands in host Python,
+and configure a compatible adapter when the worker must perform online research.
+
 ### Custom agent protocol
 
 Commands run without a shell and receive prompts on stdin. The environment

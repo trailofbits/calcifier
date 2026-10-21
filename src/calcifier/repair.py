@@ -87,6 +87,7 @@ def calcify_source(
     activity: AgentActivity | None = None,
     source_path: Path | None = None,
     python_version: str | None = None,
+    agent_capabilities: dict[str, tuple[str, ...] | None] | None = None,
 ) -> str:
     """Compile a SKILL.md into checked recipe source.
 
@@ -98,6 +99,7 @@ def calcify_source(
         provider=provider,
         resource_manifest=resource_manifest,
         agent_roles=agent_roles,
+        agent_capabilities=agent_capabilities,
         timeout=timeout,
         runtime_wall_seconds=runtime_wall_seconds,
         catalog=dict(skill_catalog or {}),
@@ -135,6 +137,7 @@ class SourceCompileContext:
     interface_requirements: str = ""
     deadline: CompilerDeadline | None = None
     finalize_source: Callable[[str], str] | None = None
+    agent_capabilities: dict[str, tuple[str, ...] | None] | None = None
 
     @property
     def calls(self) -> int:
@@ -199,6 +202,7 @@ def compile_source(context: SourceCompileContext) -> CompiledSource:
                         ),
                         wall_seconds=context.runtime_wall_seconds,
                         instruction_delivery=context.skill_path is not None,
+                        agent_capabilities=context.agent_capabilities,
                     )
                     if context.interface_requirements:
                         prompt += (
@@ -372,6 +376,7 @@ def _prepare_source_candidate(
                 skill_path=context.skill_path,
                 resource_entries=context.resource_entries,
                 review_command_gaps=review_command_gaps,
+                agent_capabilities=context.agent_capabilities,
             )
             context.activity.dry_run = outcome
     except CalcifyError as exc:
@@ -387,10 +392,15 @@ def _require_dry_run_success(
     skill_path: Path,
     resource_entries: tuple[ResourceEntry, ...] | None = None,
     review_command_gaps: bool = False,
+    agent_capabilities: dict[str, tuple[str, ...] | None] | None = None,
 ) -> DryRunResult:
     """Run concrete candidate work until completion or an unverified frontier."""
     outcome = dry_run_recipe(
-        source, recipe_path=recipe_path, skill_path=skill_path, resource_entries=resource_entries
+        source,
+        recipe_path=recipe_path,
+        skill_path=skill_path,
+        resource_entries=resource_entries,
+        agent_capabilities=agent_capabilities,
     )
     review_gap = review_command_gaps and outcome.command_gap
     if outcome.status != "failed" and not review_gap:

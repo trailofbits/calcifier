@@ -81,6 +81,14 @@ argv on the host without a shell; `mutating=True` declares an effect before
 launch. Hard dry-run blocks declared mutations. Review these operations before
 granting trust.
 
+Classify commands by everything they can execute. An analysis wrapper that
+compiles a target, runs project hooks, or loads executable configuration is
+mutating even if its primary purpose is inspection. Make target builds an
+explicit recipe input opt-in, and use an isolated environment prepared for the
+target. Setting `mutating=True` declares effects and enables dry-run suppression;
+it does not isolate the command. Keep a non-building or manual route when the
+source workflow allows one.
+
 `run_command(argv, timeout_seconds=..., output=ResultType)` requires exit zero
 and validates stdout as strict JSON of that type. Without `output`, it returns
 `CommandResult`. During compiler dry runs, read-only commands execute; mutating

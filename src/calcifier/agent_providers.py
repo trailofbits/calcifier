@@ -184,6 +184,7 @@ class ClaudeCli(AgentProvider):
     name = "claude"
 
     target_name = "claude"
+    capabilities = ("read", "write")
 
     def __init__(
         self,
@@ -229,6 +230,7 @@ class CodexCli(AgentProvider):
     native_structured_output = True
 
     target_name = "codex"
+    capabilities = ("read", "write", "commands")
 
     def __init__(
         self,
@@ -299,11 +301,13 @@ class CommandCli(AgentProvider):
         command: tuple[str, ...],
         *,
         default_timeout: float | None = None,
+        capabilities: tuple[str, ...] | None = None,
     ) -> None:
         self.name = role
         self.command = command
         self.target_name = command[0]
         self.default_timeout = default_timeout
+        self.capabilities = capabilities
 
     def is_available(self) -> bool:
         return shutil.which(self.command[0]) is not None

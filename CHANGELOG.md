@@ -6,12 +6,17 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
 
 ### Added
 
+- Worker tool capabilities reach generation, repair, and compiler dry runs.
+  Custom adapters can declare supported operations, and agent calls can require
+  them before invocation without granting additional permissions (#7).
 - Generated recipes and retained baselines include PEP 723 metadata declaring
   their Python minimum and exact Calcifier dependency, enabling script runners
   such as `uv run` to provision the environment (#19).
 
 ### Fixed
 
+- Command authoring guidance accounts for implicit target builds and executable
+  configuration, requiring opt-in and isolation for build-capable analysis (#11).
 - Optional command workflows can distinguish launch failures and local timeouts
   through `RecipeError.command_failure`. Generation and repair receive this
   contract and guidance to preserve fallback environments. Shared-budget

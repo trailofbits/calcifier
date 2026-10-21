@@ -152,6 +152,8 @@ class AgentProvider(ABC):
     remediation: str | None = None
     model: str | None = None
     reasoning_effort: str | None = None
+    # None means the adapter has not declared its tool support. It is not a grant.
+    capabilities: tuple[str, ...] | None = None
 
     @abstractmethod
     def invoke(

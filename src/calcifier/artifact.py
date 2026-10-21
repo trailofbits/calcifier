@@ -192,6 +192,7 @@ def prepare_artifact(  # noqa: C901 - baseline preparation and compiler improvem
             provider=provider,
             resource_manifest=manifest_summary(resources) or "(none)",
             agent_roles=agent_roles,
+            agent_capabilities={role: registry.get(role).capabilities for role in agent_roles},
             timeout=timeout,
             runtime_wall_seconds=wall_seconds,
             catalog={
