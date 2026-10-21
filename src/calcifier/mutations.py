@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from . import trace as _trace
 from .atomic_io import atomic_write as _atomic_write
-from .exceptions import RecipeError
+from .exceptions import RecipeError, UnmaterializedArtifactError
 from .hashing import sha256_hex
 from .outputs import _adapter, output_type
 from .path_syntax import PathSyntax
@@ -57,16 +57,17 @@ def _output_path(  # noqa: C901 - write boundaries plus compiler scratch redirec
             raise RecipeError(f"artifact writes cannot modify .git paths: {path!s}")
         if syntax.has_windows_reserved_name:
             raise RecipeError(f"artifact path contains a Windows reserved name: {path!s}")
+    scratch = ctx.hooks.scratch_output_root
+    scratch_root = None
+    if ctx.dry_run is DryRunMode.SOFT and scratch is not None and not root.is_relative_to(scratch):
+        scratch_root = scratch.joinpath("absolute-output", *root.parts[1:])
+        # Helpers return physical scratch paths; accept them in subsequent helper calls.
+        if resolved.is_relative_to(scratch_root):
+            resolved = root / resolved.relative_to(scratch_root)
     if not resolved.is_relative_to(root):
         raise RecipeError(f"artifact path escapes declared output root: {path!s}")
-    scratch = ctx.hooks.scratch_output_root
-    if (
-        redirect_scratch
-        and ctx.dry_run is DryRunMode.SOFT
-        and scratch is not None
-        and not root.is_relative_to(scratch)
-    ):
-        resolved = scratch.joinpath("absolute-output", *root.parts[1:], resolved.relative_to(root))
+    if redirect_scratch and scratch_root is not None:
+        resolved = scratch_root / resolved.relative_to(root)
     return resolved
 
 
@@ -89,8 +90,13 @@ def ensure_directory(
     This validates destinations before external writes; it does not sandbox the subprocess.
     """
     target = _output_path(path)
-    _preflight_outputs(path, tuple(output_files), tuple(exclude_roots), overwrite=overwrite)
+    planned = _preflight_outputs(
+        path, tuple(output_files), tuple(exclude_roots), overwrite=overwrite
+    )
     ctx = cast("_trace.RunContext", _trace.current())
+    if ctx.dry_run is DryRunMode.SOFT and ctx.hooks.scratch_output_root is not None:
+        with ctx.output_writes.lock:
+            ctx.output_writes.planned.update(planned)
     effect = record_side_effect(
         "file_write",
         str(target),
@@ -116,9 +122,9 @@ def _preflight_outputs(
     exclude_roots: tuple[str | Path, ...],
     *,
     overwrite: bool,
-) -> None:
+) -> tuple[Path, ...]:
     if not output_files and not exclude_roots:
-        return
+        return ()
     directory = _output_path(path, redirect_scratch=False)
     excluded = tuple(Path(root).resolve() for root in exclude_roots)
     candidates = tuple(directory / PathSyntax.inspect(file).native for file in output_files)
@@ -133,6 +139,7 @@ def _preflight_outputs(
         _preflight_output_file(candidate, overwrite=overwrite)
     if any(a != b and b.is_relative_to(a) for a in resolved for b in resolved):
         raise RecipeError("a planned output file is also another output's parent directory")
+    return tuple(_output_path(file) for file in candidates)
 
 
 def _preflight_output_file(path: Path, *, overwrite: bool) -> None:
@@ -252,6 +259,19 @@ def verify_artifact(
     ctx = cast("_trace.RunContext", _trace.current())
     if _suppress_output(ctx, target):
         return target
+    if (
+        ctx.dry_run is DryRunMode.SOFT
+        and ctx.hooks.scratch_output_root is not None
+        and not target.exists()
+        and target in ctx.output_writes.unmaterialized
+    ):
+        error = (
+            f"declared output is unavailable after a suppressed command: {target}; "
+            "saved content and downstream checks remain unverified"
+        )
+        if ctx.hooks.artifact_gap is not None:
+            ctx.hooks.artifact_gap(f"{UnmaterializedArtifactError.__name__}: {error}")
+        raise UnmaterializedArtifactError(error)
     if not target.is_file():
         raise RecipeError(f"required artifact does not exist: {target}")
     data = target.read_bytes()
@@ -308,6 +328,10 @@ def run_command[T = CommandResult](  # noqa: C901 - effect lifecycle, simulation
     project configuration are mutating. Require explicit recipe input opt-in before target
     builds, and run them in an isolated environment; mutating=True does not isolate a process.
     Preserve a non-building/manual route when the source workflow permits one.
+    Inspect the supported dependency contract before repeating stateful imports or writes.
+    Aggregate compatible inputs or use append behavior only when that release supports it.
+    Verify the final combined artifact against all input evidence; successful per-input
+    counters alone do not establish accumulation.
     """
     ctx = _command_context(mutating)
     if not argv or any(not isinstance(part, str) or not part for part in argv):
@@ -327,6 +351,8 @@ def run_command[T = CommandResult](  # noqa: C901 - effect lifecycle, simulation
             pending=True,
         )
     if mutating and ctx is not None and ctx.dry_run is DryRunMode.SOFT:
+        with ctx.output_writes.lock:
+            ctx.output_writes.unmaterialized.update(ctx.output_writes.planned)
         if adapter is not None:
             return _command_stub(adapter)
         return cast("T", CommandResult(list(argv), 0, "", ""))

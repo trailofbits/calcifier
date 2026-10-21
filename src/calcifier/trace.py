@@ -41,6 +41,7 @@ class RunHooks:
     verify_dependency: Callable[[Path, Path, str], None] | None = None
     scratch_output_root: Path | None = None
     command_gap: Callable[[list[str], str | Path, str], bool] | None = None
+    artifact_gap: Callable[[str], None] | None = None
 
 
 _DEFAULT_REDACTED = frozenset(
@@ -165,6 +166,9 @@ class OutputWrites:
 
     protect_existing: bool = False
     created: set[Path] = field(default_factory=set)
+    # Compiler-only output plans; suppression never fabricates these files.
+    planned: set[Path] = field(default_factory=set)
+    unmaterialized: set[Path] = field(default_factory=set)
     lock: Any = field(default_factory=threading.RLock, repr=False)
 
 
