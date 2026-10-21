@@ -10,7 +10,7 @@ import pytest
 from calcifier.calcify import calcify_source
 from calcifier.recipe_draft import draft_response
 from tests.support.compiler import ScriptedCompiler
-from tests.support.recipes import _GOOD_RECIPE
+from tests.support.recipes import _GOOD_RECIPE, _SCRIPT_HEADER
 from tests.support.skill_source import SKILL
 
 
@@ -54,7 +54,7 @@ def test_invalid_whitespace_draft_gets_a_diagnosed_bounded_repair(whitespace):
     rejected = draft_response(whitespace)
     provider = ScriptedCompiler([rejected, draft_response(_GOOD_RECIPE)])
     source = calcify_source(SKILL, provider)
-    assert source == _GOOD_RECIPE + "\n"
+    assert source == _SCRIPT_HEADER + _GOOD_RECIPE + "\n"
     assert len(provider.all_prompts) == 2
     prompt = provider.all_prompts[1]
     assert "recipe draft source is empty" in prompt

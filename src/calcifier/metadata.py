@@ -3,17 +3,58 @@
 from __future__ import annotations
 
 import ast
+import io
 import os
 import re
+import tokenize
 from collections.abc import Mapping
 from pathlib import Path
 
 from .diagnostics import CalcifyError
 from .hashing import sha256_hex
 from .skill_package import ResourceEntry
+from .source_quality import python_feature_version
 
 _METADATA_MARKER = "# --- calcifier metadata (skill provenance + sha256) ---"
 _METADATA_RE = re.compile(rf"(?m)^{re.escape(_METADATA_MARKER)}\s*$")
+_SCRIPT_METADATA_RE = re.compile(r"(?m)^# /// script\r?\n(?:#(?: .*)?\r?\n)*?# ///(?:\r?\n|$)")
+
+
+def attach_script_metadata(source: str, python_version: str | None = None) -> str:
+    """Stamp runner requirements for the installed recipe API, preserving source literals."""
+    from . import __version__
+
+    # Generated modules import only the standard library and Calcifier. External
+    # programs and packaged scripts retain their own dependency environments.
+    minimum = max((3, 13), python_feature_version(python_version) or (3, 13))
+    comments = {
+        token.start[0]
+        for token in tokenize.generate_tokens(io.StringIO(source).readline)
+        if token.type == tokenize.COMMENT and token.start[1] == 0
+    }
+    for match in reversed(list(_SCRIPT_METADATA_RE.finditer(source))):
+        line = source.count("\n", 0, match.start()) + 1
+        if all(line + offset in comments for offset in range(len(match.group().splitlines()))):
+            source = source[: match.start()] + source[match.end() :]
+    newline = "\r\n" if "\r\n" in source else "\n"
+    header = newline.join(
+        (
+            "# /// script",
+            f'# requires-python = ">={minimum[0]}.{minimum[1]}"',
+            f'# dependencies = ["calcifier=={__version__}"]',
+            "# ///",
+            "",
+            "",
+        )
+    )
+    # Keep an executable script's shebang and encoding cookie in their original positions.
+    lines = source.splitlines(keepends=True)
+    prefix = 0
+    if lines and lines[0].startswith("#!"):
+        prefix = 1
+    if len(lines) > prefix and re.match(r"#.*coding[:=]\s*[-\w.]+", lines[prefix]):
+        prefix += 1
+    return "".join(lines[:prefix]) + header + "".join(lines[prefix:]).lstrip("\r\n")
 
 
 def split_metadata(source: str) -> tuple[str, str | None]:

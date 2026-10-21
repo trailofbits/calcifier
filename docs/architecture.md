@@ -31,7 +31,8 @@ SKILL.md + resources + configured roles
    child interfaces, and budget guidance. The compiler moves concrete,
    repeatable work into Python while keeping interpretation with agents.
 4. `recipe_draft.py` checks envelope structure, grammar, size, depth, node kinds,
-   and syntax warnings. `metadata.py` attaches skill, resource, and child hashes.
+   and syntax warnings. `metadata.py` attaches runner requirements and skill,
+   resource, and child hashes.
    Ruff formats the complete candidate and applies safe fixes. The
    gate collects independent Ruff, module-shape, ty, and semantic findings on
    that source so a repair can address them together.
