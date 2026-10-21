@@ -114,6 +114,9 @@ def output_type[T](
     Preserve every source-required field through deterministic rendering, regardless
     of grouping or category. A valid record does not establish that its final report
     retains those values; render required fields for every applicable record.
+    When the source requires a reconciled final result, derive it after validation
+    and retries; keep phase history separate from final findings and explicitly
+    account for inputs that remain unprocessed or incomplete.
     """
 
     def decorate(target: type[T]) -> type[T]:

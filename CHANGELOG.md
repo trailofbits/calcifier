@@ -18,6 +18,10 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
 
 ### Fixed
 
+- Installed completion guidance requires independently observed checks, full
+  inventory provenance, and executed measurements before claiming measured
+  completion. Neutral regressions distinguish incomplete and empty scope and
+  reject worker completion claims when required host checks fail (#13, #18).
 - Compiler scratch redirection preserves helper-returned paths when chained
   through writes and verification under absolute output roots.
 - Predeclared subprocess outputs remain absent and explicitly unverified after
@@ -28,8 +32,9 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
   cover replace-by-default imports and lost evidence despite success counters
   (#15).
 - Installed generation contracts require source-required fields to survive
-  grouped rendering and saved delivery to use a trusted destination plus
-  independent content/inventory verification (#12, #14).
+  grouped rendering, reconcile final findings and coverage after retries, and
+  verify saved delivery at a trusted destination against the complete intended
+  inventory (#12, #14).
 - Prepared context can gather source files and manifests with resolved readable
   roots, rejecting an escaping selection before reading any contents while
   retaining authorized resources, external inputs, and LF/CRLF content (#9).
