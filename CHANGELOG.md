@@ -6,6 +6,9 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
 
 ### Added
 
+- Compilers can flag advisory source material with a suitability note for owner
+  review. The note reaches CLI output and compiler traces independently of
+  mechanical compilation and dry-run outcomes (#16).
 - Worker tool capabilities reach generation, repair, and compiler dry runs.
   Custom adapters can declare supported operations, and agent calls can require
   them before invocation without granting additional permissions (#7).

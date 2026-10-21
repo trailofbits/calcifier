@@ -65,6 +65,7 @@ class AgentActivity:
     model_calls: int = 0
     outcome: str = "in_progress"
     retained_reason: str | None = None
+    suitability_note: str | None = None
     dry_run: DryRunResult | None = None
     model: str | None = None
     reasoning_effort: str | None = None

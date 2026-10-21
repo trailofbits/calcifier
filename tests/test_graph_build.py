@@ -75,6 +75,7 @@ def _compiler(
     expected_compilation_timeout=None,
     expected_max_compiler_calls=None,
     expected_runtime_wall_seconds=10800,
+    suitability_note=None,
 ):
     calls = []
 
@@ -103,10 +104,23 @@ def _compiler(
         return PreparedArtifact(
             output,
             attach_metadata(source, skill, recipe_path=output, subrecipes=skill_catalog),
+            suitability_note=suitability_note,
         )
 
     monkeypatch.setattr("calcifier.graph_build.prepare_artifact", prepare)
     return calls
+
+
+def test_build_reports_per_node_suitability_assessments(tmp_path, monkeypatch, caplog):
+    spec = _spec(tmp_path)
+    note = "Most reasoning remains agent-owned; review extraction usefulness."
+    _compiler(monkeypatch, tmp_path, suitability_note=note)
+
+    catalog = build_graph(spec, Registry())
+
+    assert catalog.exists()
+    assert f"worker: owner suitability review required (compiler assessment): {note}" in caplog.text
+    assert f"entry: owner suitability review required (compiler assessment): {note}" in caplog.text
 
 
 def test_build_compiles_dependencies_and_publishes_a_pinned_catalog(tmp_path, monkeypatch):

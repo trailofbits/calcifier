@@ -173,7 +173,7 @@ def build_graph(
 
     def compile_node(name: str, *, optimize: bool = True) -> PreparedArtifact:
         node = spec["nodes"][name]
-        return prepare_artifact(
+        artifact = prepare_artifact(
             Path(node["skill"]),
             registry,
             output=staging / node["output"],
@@ -191,6 +191,13 @@ def build_graph(
             resource_sources=node["resources"],
             optimize=optimize,
         )
+        if artifact.suitability_note:
+            logger.warning(
+                "%s: owner suitability review required (compiler assessment): %s",
+                name,
+                artifact.suitability_note,
+            )
+        return artifact
 
     for name in build_order(spec["nodes"]):
         node = spec["nodes"][name]

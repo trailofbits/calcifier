@@ -85,6 +85,11 @@ def render_compiler_activity(activity: AgentActivity) -> str:
         result += "\ncompilation: baseline retained; compiler improvement failed: " + (
             activity.retained_reason or ""
         )
+    if activity.suitability_note:
+        result += (
+            "\nsuitability: owner review required (compiler assessment): "
+            + activity.suitability_note
+        )
     return result
 
 
@@ -92,6 +97,7 @@ def compiler_activity_payload(activity: AgentActivity) -> dict[str, object]:
     """Return structured compiler telemetry, including per-stage diagnostics."""
     return {
         "outcome": activity.outcome,
+        "suitability_note": activity.suitability_note,
         "model_calls": compiler_request_count(activity),
         "max_model_calls": activity.max_model_calls,
         "model": activity.model or "provider-default",
