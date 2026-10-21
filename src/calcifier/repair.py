@@ -34,7 +34,7 @@ from .diagnostics import (
 from .dry_run import DryRunResult, dry_run_recipe
 from .filesystem_contract import AgentError, FilesystemContract
 from .gate import verify_source
-from .metadata import split_metadata
+from .metadata import attach_script_metadata, split_metadata
 from .outputs import strict_schema_for
 from .prompts import build_prompt
 from .recipe_draft import RecipeDraft, RecipeDraftError, parse_recipe_draft
@@ -340,6 +340,7 @@ def _prepare_source_candidate(
 ) -> CompiledSource:
     if context.finalize_source is not None:
         source = context.finalize_source(source)
+    source = attach_script_metadata(source, context.python_version)
     if context.source_path is not None:
         try:
             source = format_source(

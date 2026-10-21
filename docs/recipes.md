@@ -88,6 +88,17 @@ commands are suppressed and their typed results synthesized. An unavailable
 synthetic input can leave the dry run unverified. Synthesis neither verifies the
 command nor creates its files. See [effect boundaries](architecture.md#effects-and-provider-boundaries).
 
+An unavailable executable or another process launch failure raises `RecipeError`
+with `command_failure == "launch"`; a command's local timeout sets it to
+`"timeout"`. Optional tools can fall back by catching `RecipeError` and checking
+that attribute. Re-raise errors with `command_failure is None`: these include
+invalid arguments, invalid typed output, nonzero typed-command exits, and output
+limits. `BudgetExceeded` remains fatal when the shared deadline expires, even
+if the command was optional. If a tool runs through an environment manager,
+keep that complete argv prefix for both its availability probe and its actual
+execution. A successful import in that environment does not make a bare command
+available on the host.
+
 ## Budgets and parallel work
 
 `Budget(max_agent_calls, max_wall_seconds)` limits attempts and elapsed time.

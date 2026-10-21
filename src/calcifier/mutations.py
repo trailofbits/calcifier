@@ -16,7 +16,7 @@ from .hashing import sha256_hex
 from .outputs import _adapter, output_type
 from .path_syntax import PathSyntax
 from .side_effects import record_side_effect
-from .subprocesses import ProcessError, run_process
+from .subprocesses import ProcessError, ProcessStartError, ProcessTimeoutError, run_process
 from .trace import DryRunMode
 from .validation import bounded_timeout
 
@@ -231,6 +231,12 @@ def run_command[T = CommandResult](  # noqa: C901 - effect lifecycle, simulation
     Returns a CommandResult when output is omitted, otherwise the validated output value.
     ``output=Type`` requires a zero exit code and strictly validates JSON stdout.
     Soft dry runs synthesize mutating command results; read-only commands execute.
+    Launch failures and local timeouts raise RecipeError with ``command_failure``
+    set to "launch" or "timeout". Optional-command fallbacks may handle these;
+    re-raise other RecipeError values rather than hiding validation or output-limit failures.
+    Shared deadline exhaustion raises BudgetExceeded and must stop the workflow.
+    Retain the complete environment-specific argv prefix for fallback commands;
+    an import probe in one environment does not establish bare executable availability.
     """
     ctx = _command_context(mutating)
     if not argv or any(not isinstance(part, str) or not part for part in argv):
@@ -266,7 +272,12 @@ def run_command[T = CommandResult](  # noqa: C901 - effect lifecycle, simulation
             effect.error = type(exc).__name__
             _trace.checkpoint("side-effect-failed")
         _check_wall(budget_state)
-        raise RecipeError(f"command failed to execute: {type(exc).__name__}: {exc}") from exc
+        error = RecipeError(f"command failed to execute: {type(exc).__name__}: {exc}")
+        if isinstance(exc, ProcessStartError):
+            error.command_failure = "launch"
+        elif isinstance(exc, ProcessTimeoutError):
+            error.command_failure = "timeout"
+        raise error from exc
     if effect is not None:
         effect.completed = True
         _trace.checkpoint("side-effect-complete")

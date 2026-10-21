@@ -105,6 +105,24 @@ Parameters become kebab-case flags; booleans have `--name` and `--no-name`.
 Direct execution bypasses the CLI trust check. Use `calcifier exec` for reviewed
 file-based execution.
 
+Newly compiled recipes also include [PEP 723 inline script metadata](https://packaging.python.org/en/latest/specifications/inline-script-metadata/),
+so a script runner can provision their Python environment:
+
+```bash
+uv run path/to/.calcifier/recipe.py --help
+uv run path/to/.calcifier/recipe.py --parameter-name VALUE
+```
+
+The compiler records the exact Calcifier version used for generation and a
+Python minimum of at least 3.13, raised when the configured target is newer.
+It supplies this header for optimized recipes and retained baselines; model
+supplied dependency headers are replaced. Direct recipe imports remain limited
+to the standard library and Calcifier, whose dependencies are installed
+transitively. Packaged resources, external programs and their environments,
+and configured agent providers must still be available. Keep the recipe with
+its pinned skill and resources. `uv run` executes the script directly and
+bypasses Calcifier's trust check, just like `python recipe.py`.
+
 ### Trust
 
 Review the complete Python file before using `--trust`. Consent pins the exact

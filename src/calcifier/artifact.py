@@ -18,7 +18,7 @@ from .compiler_activity import DEFAULT_COMPILATION_TIMEOUT, CompilerDeadline
 from .diagnostics import CalcifyError, render_diagnostics
 from .dry_run import DryRunResult
 from .hashing import sha256_hex
-from .metadata import attach_metadata
+from .metadata import attach_metadata, attach_script_metadata
 from .recipe_ast import (
     collect_structure,
     decorator_keyword_call,
@@ -241,6 +241,7 @@ def prepare_artifact(  # noqa: C901 - baseline preparation and compiler improvem
 def _checked_artifact(source: str, target: Path, python_version: str | None) -> str:
     """Format the recipe with its metadata, then check it as `lint --portable` will."""
     try:
+        source = attach_script_metadata(source, python_version)
         source = format_source(source, target, python_version=python_version)
     except SourceQualityError as exc:
         raise CalcifyError(f"final generated artifact failed validation: {exc}") from exc

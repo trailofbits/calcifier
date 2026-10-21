@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.2.0 — Unreleased
+
+Development is tracked in the [release plan](docs/releases/v0.2.0.md).
+
+### Added
+
+- Generated recipes and retained baselines include PEP 723 metadata declaring
+  their Python minimum and exact Calcifier dependency, enabling script runners
+  such as `uv run` to provision the environment (#19).
+
+### Fixed
+
+- Optional command workflows can distinguish launch failures and local timeouts
+  through `RecipeError.command_failure`. Generation and repair receive this
+  contract and guidance to preserve fallback environments. Shared-budget
+  exhaustion remains fatal; validation and output-limit failures remain errors
+  (#8).
+
 ## v0.1.1 — 2026-10-14
 
 Release metadata update for the first PyPI publication. The v0.1.0 GitHub

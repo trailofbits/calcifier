@@ -11,7 +11,7 @@ from calcifier.calcify import CalcifyError, calcify_source
 from calcifier.recipe_draft import draft_response as _draft
 from tests.support.ast import source_line
 from tests.support.compiler import ScriptedCompiler as _ScriptedCompiler
-from tests.support.recipes import _GOOD, _SKILL, _UNANNOTATED_AND_WRITING, _WRITING
+from tests.support.recipes import _GOOD, _SCRIPT_HEADER, _SKILL, _UNANNOTATED_AND_WRITING, _WRITING
 
 
 def _section(prompt: str, heading: str) -> object:
@@ -26,16 +26,16 @@ def _phases(activity: AgentActivity, status: str) -> list[object]:
 
 # -- bounded source repair: exact prompt sections and error payloads ----------
 
-# Accepted drafts come back exactly as the model wrote them.
-_RENDERED_GOOD = _GOOD
+# The accepted program stays byte-exact after the compiler-owned runner header.
+_RENDERED_GOOD = _SCRIPT_HEADER + _GOOD
 _REPAIR_HEADING = "## Rejected candidate: repair "
 _ERROR_HEADING = "Validation error (JSON string):"
 _DIAGNOSTICS_HEADING = "Structured diagnostics (JSON array):"
 _REJECTED_HEADING = "Rejected source (JSON string):"
 
 
-_ANNOTATION_LINE = source_line(_UNANNOTATED_AND_WRITING, "def count_entries")
-_EFFECT_LINE = source_line(_UNANNOTATED_AND_WRITING, 'open("x.txt"')
+_ANNOTATION_LINE = source_line(_SCRIPT_HEADER + _UNANNOTATED_AND_WRITING, "def count_entries")
+_EFFECT_LINE = source_line(_SCRIPT_HEADER + _UNANNOTATED_AND_WRITING, 'open("x.txt"')
 _ANNOTATION_ERROR = (
     f"line {_ANNOTATION_LINE}: @step 'count_entries' requires an explicit return annotation"
 )
@@ -89,14 +89,14 @@ def test_repair_requests_carry_exact_json_sections() -> None:
     assert f"{_REPAIR_HEADING}1" in first.splitlines()
     assert _section(first, _ERROR_HEADING) == f"{_ANNOTATION_ERROR}; {_EFFECT_ERROR}"
     assert _section(first, _DIAGNOSTICS_HEADING) == [_ANNOTATION, _EFFECT]
-    assert _section(first, _REJECTED_HEADING) == _UNANNOTATED_AND_WRITING
+    assert _section(first, _REJECTED_HEADING) == _SCRIPT_HEADER + _UNANNOTATED_AND_WRITING
     # The second request describes only the newest candidate, never earlier attempts.
     assert second.startswith(initial)
     assert f"{_REPAIR_HEADING}2" in second.splitlines()
     assert _section(second, _ERROR_HEADING) == _EFFECT_ERROR
     assert _section(second, _DIAGNOSTICS_HEADING) == [_EFFECT]
     rejected = _section(second, _REJECTED_HEADING)
-    assert rejected == _WRITING
+    assert rejected == _SCRIPT_HEADER + _WRITING
     assert _ANNOTATION_ERROR not in second.removeprefix(initial)
 
 
@@ -111,7 +111,7 @@ def test_an_unparseable_candidate_is_shown_as_its_raw_response() -> None:
     first, second, third = compiler.prompts("repair")
     assert _section(first, _ERROR_HEADING) == _EFFECT_ERROR
     assert _section(first, _DIAGNOSTICS_HEADING) == [_EFFECT]
-    assert _section(first, _REJECTED_HEADING) == _WRITING
+    assert _section(first, _REJECTED_HEADING) == _SCRIPT_HEADER + _WRITING
     assert _section(second, _ERROR_HEADING) == _BAD_DRAFT + _OBJECT_KEY_ERROR
     assert _section(second, _DIAGNOSTICS_HEADING) == []
     assert _section(second, _REJECTED_HEADING) == "{"

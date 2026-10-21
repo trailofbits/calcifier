@@ -43,6 +43,10 @@ class ProcessError(CalcifierError, RuntimeError):
         super().__init__(message)
 
 
+class ProcessStartError(ProcessError):
+    """Raised when a process cannot be launched."""
+
+
 class ProcessTimeoutError(ProcessError):
     """Raised after terminating a timed-out process group."""
 
@@ -166,7 +170,7 @@ def _start_process(
             start_new_session=True,
         )
     except OSError as exc:
-        raise ProcessError(f"could not start {argv[0]!r}: {exc}") from exc
+        raise ProcessStartError(f"could not start {argv[0]!r}: {exc}") from exc
 
 
 def _collect_process(

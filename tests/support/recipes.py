@@ -8,6 +8,13 @@ import textwrap
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+from calcifier import __version__
+
+_SCRIPT_HEADER = (
+    '# /// script\n# requires-python = ">=3.13"\n'
+    f'# dependencies = ["calcifier=={__version__}"]\n# ///\n\n'
+)
+
 
 def write_skill(directory: Path, text: str) -> Path:
     skill = directory / "SKILL.md"
