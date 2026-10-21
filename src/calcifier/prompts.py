@@ -114,7 +114,7 @@ Import only from the Python standard library and `calcifier`. The installed reci
   `call_catalog_recipe(name, catalog, {{input_name: value, ...}})` over a closed, literal
   name-to-path mapping. Both return a `SubrecipeResult` whose `.output` is the child's value,
   shaped as the catalog's `returns` and `output_types` describe.
-Roles available for this generation are: {agent_roles_section}
+Roles available for this generation are: {agent_roles_section}; tools: {agent_capabilities}
 ## Declared tool capabilities
 {capabilities_section}
 ## Catalogued child recipes
@@ -150,6 +150,7 @@ def build_prompt(
     line_length: int | None = None,
     wall_seconds: int | None = None,
     instruction_delivery: bool = False,
+    agent_capabilities: dict[str, tuple[str, ...] | None] | None = None,
 ) -> str:
     sentinel = _make_sentinel(skill_text)
     draft_name = "RecipeDraft"
@@ -174,6 +175,10 @@ def build_prompt(
         wall_contract=_wall_contract(wall_seconds),
         capabilities_section=_capabilities_section(declared_allowed_tools(skill_text)),
         agent_roles_section=", ".join(f"`{role}`" for role in sorted(set(agent_roles))) or "(none)",
+        agent_capabilities=json.dumps(
+            {role: (agent_capabilities or {}).get(role) for role in sorted(set(agent_roles))},
+            sort_keys=True,
+        ),
         skill_catalog=json.dumps(
             _catalog_prompt_payload(skill_catalog or {}, base=catalog_base), sort_keys=True
         ),

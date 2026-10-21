@@ -80,4 +80,9 @@ def _provider_for_route(route: AgentRoute) -> AgentProvider:
         )
     if route.command is None:  # pragma: no cover - parsed configurations forbid this
         raise AgentConfigError(f"agent {route.role!r} has no command")
-    return CommandCli(route.role, route.command, default_timeout=route.timeout_seconds)
+    return CommandCli(
+        route.role,
+        route.command,
+        default_timeout=route.timeout_seconds,
+        capabilities=route.capabilities,
+    )

@@ -76,6 +76,7 @@ def dry_run_recipe(
     recipe_path: Path,
     skill_path: Path,
     resource_entries: tuple[ResourceEntry, ...] | None = None,
+    agent_capabilities: dict[str, tuple[str, ...] | None] | None = None,
 ) -> DryRunResult:
     """Run ``source`` once in a separate interpreter and report how it ended.
 
@@ -104,12 +105,19 @@ def dry_run_recipe(
             str(skill_path),
             str(recipe_path),
         ]
-        if resource_entries is not None:
-            manifest = Path(directory) / "resources.json"
-            manifest.write_text(
-                json.dumps([asdict(entry) for entry in resource_entries]), encoding="utf-8"
+        if resource_entries is not None or agent_capabilities is not None:
+            entries = (
+                discover_resources(skill_path) if resource_entries is None else resource_entries
             )
+            manifest = Path(directory) / "resources.json"
+            manifest.write_text(json.dumps([asdict(entry) for entry in entries]), encoding="utf-8")
             argv.append(str(manifest))
+        if agent_capabilities is not None:
+            capabilities_path = Path(directory) / "agent-capabilities.json"
+            capabilities_path.write_text(
+                json.dumps(agent_capabilities), encoding="utf-8", newline="\n"
+            )
+            argv.append(str(capabilities_path))
         try:
             result = run_process(
                 argv,
@@ -172,7 +180,17 @@ def main(argv: list[str]) -> int:
         if len(argv) > 4
         else None
     )
-    result = _run(Path(argv[1]), Path(argv[2]), Path(argv[3]), entries)
+    capabilities = (
+        {
+            role: tuple(value) if value is not None else None
+            for role, value in json.loads(Path(argv[5]).read_text(encoding="utf-8")).items()
+        }
+        if len(argv) > 5
+        else None
+    )
+    result = _run(
+        Path(argv[1]), Path(argv[2]), Path(argv[3]), entries, agent_capabilities=capabilities
+    )
     print(json.dumps(result._asdict()))
     return 0
 
@@ -197,6 +215,8 @@ def _run(
     skill_path: Path,
     recipe_path: Path,
     resource_entries: tuple[ResourceEntry, ...] | None = None,
+    *,
+    agent_capabilities: dict[str, tuple[str, ...] | None] | None = None,
 ) -> DryRunResult:
     hooks = RunHooks(
         parent_recipe_path=_parent_at_destination(candidate, recipe_path),
@@ -210,7 +230,9 @@ def _run(
         contextlib.chdir(directory),
     ):
         workspace = Path(directory)
-        result = _run_in_workspace(candidate, skill_path, workspace, hooks, resource_entries)
+        result = _run_in_workspace(
+            candidate, skill_path, workspace, hooks, resource_entries, agent_capabilities
+        )
         placeholders = {str(workspace.resolve()): "<workspace>", str(workspace): "<workspace>"}
     placeholders |= {str(candidate.resolve()): "<recipe>", str(candidate): "<recipe>"}
     return _with_placeholders(result, placeholders)
@@ -222,6 +244,7 @@ def _run_in_workspace(
     workspace: Path,
     hooks: RunHooks,
     resource_entries: tuple[ResourceEntry, ...] | None,
+    agent_capabilities: dict[str, tuple[str, ...] | None] | None = None,
 ) -> DryRunResult:
     try:
         recipe = load_recipe(candidate)
@@ -251,7 +274,9 @@ def _run_in_workspace(
         return True
 
     hooks = replace(hooks, scratch_output_root=workspace.resolve(), command_gap=command_gap)
-    outcome = _outcome(_execute(recipe, inputs, hooks), missing_input_roots=missing_roots)
+    outcome = _outcome(
+        _execute(recipe, inputs, hooks, agent_capabilities), missing_input_roots=missing_roots
+    )
     if gaps and outcome.status != "failed":
         errors = [error for _, error in gaps] + ([outcome.error] if outcome.error else [])
         return DryRunResult("unverified", gaps[0][0], "; ".join(errors), outcome.writes, True)
@@ -362,7 +387,12 @@ def _input_value(annotation: Any, workspace: Path) -> Any:
     return STUB_TEXT if annotation in {str, None} else None
 
 
-def _execute(recipe: Recipe, inputs: dict[str, Any], hooks: RunHooks) -> RecipeRun:
+def _execute(
+    recipe: Recipe,
+    inputs: dict[str, Any],
+    hooks: RunHooks,
+    agent_capabilities: dict[str, tuple[str, ...] | None] | None = None,
+) -> RecipeRun:
     roles, capabilities = recipe.agent_names, recipe.capabilities
     if recipe.composed:
         from .graph import inspect_graph
@@ -372,9 +402,9 @@ def _execute(recipe: Recipe, inputs: dict[str, Any], hooks: RunHooks) -> RecipeR
             path = hooks.parent_recipe_path(path)
         graph = inspect_graph(path, entry_bytes=recipe.source_bytes)
         roles, capabilities = graph.agents, graph.capabilities
-    registry = _StubRegistry()
+    registry = _StubRegistry(agent_capabilities)
     for role in roles:
-        registry.register(_SchemaStub(role))
+        registry.get(role)
     tools = ToolRegistry()
     for name in capabilities:
         tools.register(Capability(name, "dry-run"), _EmptyTool())
@@ -447,14 +477,15 @@ def _failing_step(records: list[Any]) -> tuple[str | None, str | None]:
 class _StubRegistry(Registry):
     """Answer any role with a schema stub, including roles of children not yet pinned."""
 
-    def __init__(self) -> None:
+    def __init__(self, capabilities: dict[str, tuple[str, ...] | None] | None = None) -> None:
         super().__init__()
         self._lock = threading.Lock()
+        self._capabilities = dict(capabilities or {})
 
     def get(self, name: str) -> AgentProvider:
         with self._lock:
             if name not in self.known():
-                self.register(_SchemaStub(name))
+                self.register(_SchemaStub(name, self._capabilities.get(name)))
         return super().get(name)
 
 
@@ -471,9 +502,10 @@ class _EmptyTool:
 class _SchemaStub(AgentProvider):
     """Answer every call with output synthesized from its JSON schema."""
 
-    def __init__(self, role: str) -> None:
+    def __init__(self, role: str, capabilities: tuple[str, ...] | None = None) -> None:
         self.name = role
         self.default_timeout = 30
+        self.capabilities = capabilities
 
     def _structured_schema(self, annotation: Any) -> dict[str, Any]:
         # Native normalization loses tuple positions; exercise the exact host shape.

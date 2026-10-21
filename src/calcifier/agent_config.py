@@ -24,7 +24,8 @@ class AgentConfigError(CalcifierError, ValueError):
 ROLE_RE = re.compile(r"[A-Za-z][A-Za-z0-9._-]*")
 _MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]*")
 BUILTIN_AGENTS = frozenset({"claude", "codex"})
-# Claude's whole tool allowlist: agents read and search, and never write or run commands.
+AGENT_CAPABILITIES = frozenset({"read", "write", "commands", "research"})
+# Read/search tools are always enabled; writable calls add scoped Edit/Write separately.
 _CLAUDE_READ_TOOLS = "Read,Glob,Grep"
 _CODEX_REASONING_EFFORTS = frozenset(
     {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
@@ -49,6 +50,7 @@ class AgentRoute:
     remediation: str | None = None
     model: str | None = None
     reasoning_effort: str | None = None
+    capabilities: tuple[str, ...] | None = None
 
     @property
     def target_type(self) -> str:
@@ -80,6 +82,8 @@ class AgentRoute:
             result["model"] = self.model
         if self.reasoning_effort is not None:
             result["reasoning_effort"] = self.reasoning_effort
+        if self.capabilities is not None:
+            result["capabilities"] = list(self.capabilities)
         return result
 
 
@@ -164,6 +168,7 @@ def _parse_route(role: str, raw: object) -> AgentRoute:
             "remediation",
             "model",
             "reasoning_effort",
+            "capabilities",
         },
         f"agent {role!r}",
     )
@@ -198,6 +203,7 @@ def _parse_route(role: str, raw: object) -> AgentRoute:
         raise AgentConfigError(f"agent {role!r} remediation must be a string")
     model = _parse_model(role, route.get("model"), builtin)
     reasoning_effort = _parse_codex_reasoning_effort(role, route.get("reasoning_effort"), builtin)
+    capabilities = _parse_capabilities(role, route.get("capabilities"), builtin)
     return AgentRoute(
         role,
         builtin,
@@ -207,7 +213,22 @@ def _parse_route(role: str, raw: object) -> AgentRoute:
         remediation,
         model,
         reasoning_effort,
+        capabilities,
     )
+
+
+def _parse_capabilities(role: str, value: object, builtin: str | None) -> tuple[str, ...] | None:
+    if value is None:
+        return None
+    if builtin is not None:
+        raise AgentConfigError(f"agent {role!r} builtin capabilities cannot be overridden")
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or item not in AGENT_CAPABILITIES for item in value
+    ):
+        raise AgentConfigError(
+            f"agent {role!r} capabilities must be an array drawn from {sorted(AGENT_CAPABILITIES)}"
+        )
+    return tuple(sorted(set(value)))
 
 
 def _parse_model(role: str, value: object, builtin: str | None) -> str | None:
