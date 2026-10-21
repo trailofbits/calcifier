@@ -18,6 +18,9 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
 
 ### Fixed
 
+- Installed generation contracts require source-required fields to survive
+  grouped rendering and saved delivery to use a trusted destination plus
+  independent content/inventory verification (#12, #14).
 - Prepared context can gather source files and manifests with resolved readable
   roots, rejecting an escaping selection before reading any contents while
   retaining authorized resources, external inputs, and LF/CRLF content (#9).
