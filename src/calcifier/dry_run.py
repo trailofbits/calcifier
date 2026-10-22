@@ -12,6 +12,7 @@ an absent default input path is also unverified: this workspace cannot tell a
 missing fixture from a misspelled path inside that fixture. Nonzero command
 exits involving synthetic or absent inputs are gaps; validated output stubs
 let remaining steps run. Other command failures reject the candidate.
+Required Path inputs use a separate temporary tree from the working/output workspace.
 """
 
 from __future__ import annotations
@@ -236,8 +237,7 @@ def _run(
         parent_recipe_path=_parent_at_destination(candidate, recipe_path),
         verify_dependency=_skip_dependency_pin,
     )
-    # A relative output_root resolves against the working directory when the recipe loads,
-    # so the recipe loads and runs inside the workspace its synthesized inputs point to.
+    # A relative output_root resolves at load time; load and run in the same workspace.
     # The previous directory comes back before cleanup, which Windows requires.
     with (
         tempfile.TemporaryDirectory(prefix="calcifier-dry-run-workspace-") as directory,
@@ -270,9 +270,25 @@ def _run_in_workspace(
         recipe = load_recipe(candidate)
     except (RecipeError, SyntaxError) as exc:
         return DryRunResult("failed", None, f"{type(exc).__name__}: {exc}")
-    _prepare_workspace(recipe, skill_path, workspace, resource_entries)
+    with tempfile.TemporaryDirectory(prefix="calcifier-dry-run-input-") as directory:
+        input_root = Path(directory).resolve() / "input"
+        _prepare_workspace(recipe, skill_path, workspace, resource_entries, input_root=input_root)
+        result = _run_prepared_recipe(
+            recipe, workspace, hooks, input_root=input_root, agent_capabilities=agent_capabilities
+        )
+        return _with_placeholders(result, {str(input_root): "<input>"})
+
+
+def _run_prepared_recipe(
+    recipe: Recipe,
+    workspace: Path,
+    hooks: RunHooks,
+    *,
+    input_root: Path,
+    agent_capabilities: dict[str, tuple[str, ...] | None] | None,
+) -> DryRunResult:
     text_root = workspace / STUB_TEXT
-    inputs = _inputs(recipe, workspace)
+    inputs = _inputs(recipe, input_root)
     if inputs is None:
         return DryRunResult("unverified", None, "a required recipe input cannot be synthesized")
     missing_roots = _missing_default_roots(recipe, workspace)
@@ -280,7 +296,9 @@ def _run_in_workspace(
     artifact_gaps: list[tuple[str | None, str]] = []
 
     def command_gap(argv: list[str], cwd: str | Path, error: str) -> bool:
-        if not _command_input_gap(argv, cwd, workspace, (*missing_roots, text_root)):
+        if not _command_input_gap(
+            argv, cwd, workspace, (*missing_roots, text_root), synthetic_roots=(input_root,)
+        ):
             return False
         frame = current_frame()
         gaps.append((frame.name if frame else None, error))
@@ -310,6 +328,8 @@ def _prepare_workspace(
     skill_path: Path,
     workspace: Path,
     resource_entries: tuple[ResourceEntry, ...] | None,
+    *,
+    input_root: Path,
 ) -> None:
     entries = discover_resources(skill_path) if resource_entries is None else resource_entries
     recipe.skill_root = skill_path.parent
@@ -317,7 +337,7 @@ def _prepare_workspace(
     if not recipe.skill_sha256:
         recipe.skill_sha256 = sha256_hex(skill_path.read_bytes())
     recipe.resources = tuple((entry.path, entry.sha256, entry.source) for entry in entries)
-    for root in (workspace, workspace / STUB_TEXT, workspace / "input"):
+    for root in (workspace, workspace / STUB_TEXT, input_root):
         root.mkdir(exist_ok=True)
         (root / "example.txt").write_bytes(b"example\n")
 
@@ -342,7 +362,12 @@ def _with_gaps(
 
 
 def _command_input_gap(
-    argv: list[str], cwd: str | Path, workspace: Path, missing_roots: tuple[Path, ...]
+    argv: list[str],
+    cwd: str | Path,
+    workspace: Path,
+    missing_roots: tuple[Path, ...],
+    *,
+    synthetic_roots: tuple[Path, ...] = (),
 ) -> bool:
     """Only invocations naming synthetic or unavailable inputs can be inconclusive."""
     workspace = workspace.resolve()
@@ -355,7 +380,7 @@ def _command_input_gap(
             resolved = (base / path).resolve()
             if any(
                 resolved in {root, root / "example.txt"}
-                for root in (workspace / STUB_TEXT, workspace / "input")
+                for root in (workspace / STUB_TEXT, *synthetic_roots)
             ):
                 return True
             if not resolved.exists() and any(resolved.is_relative_to(root) for root in roots):
@@ -419,27 +444,27 @@ def _with_placeholders(result: DryRunResult, placeholders: dict[str, str]) -> Dr
     )
 
 
-def _inputs(recipe: Recipe, workspace: Path) -> dict[str, Any] | None:
+def _inputs(recipe: Recipe, input_root: Path) -> dict[str, Any] | None:
     hints = get_type_hints(recipe.fn)
     inputs: dict[str, Any] = {}
     for name, parameter in inspect.signature(recipe.fn).parameters.items():
         if parameter.default is not inspect.Parameter.empty:
             continue
-        value = _input_value(hints.get(name), workspace)
+        value = _input_value(hints.get(name), input_root)
         if value is None:
             return None
         inputs[name] = value
     return inputs
 
 
-def _input_value(annotation: Any, workspace: Path) -> Any:
+def _input_value(annotation: Any, input_root: Path) -> Any:
     origin, arguments = get_origin(annotation), get_args(annotation)
     if origin in {list, tuple} and arguments:
         elements = arguments[:-1] if arguments[-1] is Ellipsis else arguments
-        values = [_input_value(element, workspace) for element in elements]
+        values = [_input_value(element, input_root) for element in elements]
         return None if any(value is None for value in values) else origin(values)
     if annotation is Path:
-        return workspace / "input"
+        return input_root
     if annotation is bool:
         return False
     if annotation in {int, float}:

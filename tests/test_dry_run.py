@@ -120,7 +120,7 @@ def test_required_inputs_are_synthesized_by_annotation(
     value = dry_run._input_value(annotation, tmp_path)
 
     if expected == "workspace":
-        assert value == tmp_path / "input"
+        assert value == tmp_path
     elif expected == "text":
         assert value == "stub"
     else:
@@ -417,7 +417,7 @@ _WRITER = textwrap.dedent(
 
     @step
     def save(output_dir: str) -> Path:
-        return write_text(f"{output_dir}/entry.md", "entry")
+        return write_text(f"{Path(output_dir).name}/entry.md", "entry")
 
 
     @recipe(output_root=".")
@@ -438,20 +438,20 @@ def test_a_relative_output_root_is_the_dry_run_workspace(
     candidate, skill = _harness(monkeypatch, tmp_path, source)
     before = Path.cwd()
 
-    # Soft dry-run mode records the declared write under the workspace without writing.
+    # Derive an output-root-relative destination from the separate input's name.
     assert dry_run._run(candidate, skill, candidate) == DryRunResult("passed", writes=(write,))
     assert Path.cwd() == before
 
 
 @pytest.mark.parametrize(
     ("annotation", "missing"),
-    [("str", Path("stub/missing.md")), ("Path", "<workspace>/input/missing.md")],
+    [("str", Path("stub/missing.md")), ("Path", "<input>/missing.md")],
 )
 def test_dry_run_errors_name_the_workspace_instead_of_its_temporary_path(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, annotation: str, missing: str | Path
 ) -> None:
     source = _WRITER.replace(
-        'return write_text(f"{output_dir}/entry.md", "entry")',
+        'return write_text(f"{Path(output_dir).name}/entry.md", "entry")',
         'return Path(output_dir, "missing.md").read_text()',
     ).replace("output_dir: str", f"output_dir: {annotation}")
     candidate, skill = _harness(monkeypatch, tmp_path, source)
