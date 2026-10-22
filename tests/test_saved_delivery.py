@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 
 from calcifier.artifact import prepare_artifact
-from calcifier.prompts import build_prompt
 from calcifier.recipe import load_recipe
 from calcifier.registry import Registry
 from tests.support.agents import StubProvider
@@ -140,10 +139,3 @@ def test_complete_saved_report_is_announced_from_the_trusted_destination(
     assert Path(result.output).read_bytes() == worker.contents
     assert worker.invocations == 1
     assert any(artifact.name == "saved-report" for artifact in result.artifacts)
-
-
-def test_generation_receives_saved_delivery_and_required_rendering_contracts():
-    prompt = " ".join(build_prompt("Save the complete review.").split())
-    assert "verify the trusted declared destination, never a worker-provided path" in prompt
-    assert "compare its records with the full independently gathered inventory" in prompt
-    assert "Preserve every source-required field through deterministic rendering" in prompt

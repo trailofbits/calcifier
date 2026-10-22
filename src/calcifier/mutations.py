@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import sys
-from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -74,8 +73,8 @@ def _output_path(  # noqa: C901 - write boundaries plus compiler scratch redirec
 def ensure_directory(
     path: str | Path = ".",
     *,
-    output_files: Iterable[str | Path] = (),
-    exclude_roots: Iterable[str | Path] = (),
+    output_files: tuple[str | Path, ...] = (),
+    exclude_roots: tuple[str | Path, ...] = (),
     overwrite: bool = False,
 ) -> Path:
     """Create a directory inside the recipe output root and return its path.
@@ -89,6 +88,9 @@ def ensure_directory(
     when the run's output policy permits replacement; --output-dir protection still applies.
     This validates destinations before external writes; it does not sandbox the subprocess.
     """
+    for name, paths in (("output_files", output_files), ("exclude_roots", exclude_roots)):
+        if isinstance(paths, (str, bytes)):
+            raise TypeError(f"{name} must be a tuple of paths, not str or bytes")
     target = _output_path(path)
     planned = _preflight_outputs(
         path, tuple(output_files), tuple(exclude_roots), overwrite=overwrite
@@ -249,11 +251,8 @@ def verify_artifact(
 
     Requires an active recipe step, including the recipe body. Records the
     verified path, hash and size; ordinary soft dry runs suppress filesystem checks.
-    Before announcing saved delivery, verify the trusted declared destination, never a
-    worker-provided path. Existence and a worker's saved/completed flag do not establish
-    complete content: parse the saved artifact and compare its records with the full
-    independently gathered inventory, or check a hash of independently expected bytes.
-    Preserve a usable alternate answer or fail delivery when these checks fail.
+    Existence, nonempty content and a matching hash do not establish semantic completeness
+    or coverage of the workflow's inputs.
     """
     target = _output_path(path, writing=False)
     ctx = cast("_trace.RunContext", _trace.current())
@@ -322,16 +321,7 @@ def run_command[T = CommandResult](  # noqa: C901 - effect lifecycle, simulation
     set to "launch" or "timeout". Optional-command fallbacks may handle these;
     re-raise other RecipeError values rather than hiding validation or output-limit failures.
     Shared deadline exhaustion raises BudgetExceeded and must stop the workflow.
-    Retain the complete environment-specific argv prefix for fallback commands;
-    an import probe in one environment does not establish bare executable availability.
-    Classify effective behavior: analysis wrappers that compile targets or load executable
-    project configuration are mutating. Require explicit recipe input opt-in before target
-    builds, and run them in an isolated environment; mutating=True does not isolate a process.
-    Preserve a non-building/manual route when the source workflow permits one.
-    Inspect the supported dependency contract before repeating stateful imports or writes.
-    Aggregate compatible inputs or use append behavior only when that release supports it.
-    Verify the final combined artifact against all input evidence; successful per-input
-    counters alone do not establish accumulation.
+    Declaring mutating=True does not isolate a process.
     """
     ctx = _command_context(mutating)
     if not argv or any(not isinstance(part, str) or not part for part in argv):

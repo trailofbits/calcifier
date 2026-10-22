@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import tempfile
-from collections.abc import Generator, Iterable
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -42,8 +42,8 @@ def prepare_context(
     instructions: str = "",
     prior_results: str = "",
     byte_budget: int = 65536,
-    files: Iterable[str | Path] = (),
-    readable_roots: Iterable[str | Path] = (),
+    files: tuple[str | Path, ...] = (),
+    readable_roots: tuple[str | Path, ...] = (),
 ) -> PreparedContext:
     """Save the complete task in per-run scratch storage; the budget limits embedding only.
 
@@ -91,8 +91,11 @@ def prepare_context(
     return PreparedContext(prompt, str(root), byte_budget)
 
 
-def _context_files(files: Iterable[str | Path], readable_roots: Iterable[str | Path]) -> str:
+def _context_files(files: tuple[str | Path, ...], readable_roots: tuple[str | Path, ...]) -> str:
     """Validate the complete selection before reading any file into the bundle."""
+    for name, paths in (("files", files), ("readable_roots", readable_roots)):
+        if isinstance(paths, (str, bytes)):
+            raise TypeError(f"{name} must be a tuple of paths, not str or bytes")
     selected = tuple(Path(path) for path in files)
     if not selected:
         return ""
@@ -100,16 +103,29 @@ def _context_files(files: Iterable[str | Path], readable_roots: Iterable[str | P
         roots = tuple(Path(root).resolve(strict=True) for root in readable_roots)
         if not roots:
             raise RecipeError("prepared-context files require explicit readable_roots")
-        resolved = tuple(path.resolve(strict=True) for path in selected)
+        resolved = _resolve_context_files(selected, roots)
+        records = []
         for source, target in zip(selected, resolved, strict=True):
-            if not any(target.is_relative_to(root) for root in roots):
-                raise RecipeError(f"prepared-context file escapes readable_roots: {source}")
-            if not target.is_file():
-                raise RecipeError(f"prepared-context input is not a regular file: {source}")
-        records = [
-            {"path": str(source), "text": target.read_bytes().decode("utf-8")}
-            for source, target in zip(selected, resolved, strict=True)
-        ]
+            text = target.read_bytes().decode("utf-8")
+            # Bound even one very long source line, including JSON escaping expansion.
+            chunks = [text[start : start + 256] for start in range(0, len(text), 256)]
+            records.append({"path": str(source), "text_chunks": chunks})
     except (OSError, UnicodeError) as exc:
         raise RecipeError(f"cannot read prepared-context files: {exc}") from exc
-    return "\nFiles:\n" + json.dumps(records, ensure_ascii=False) + "\n"
+    return (
+        "\nFile contents: concatenate each text_chunks array without separators for the exact "
+        "UTF-8 text, including its original line endings.\nFiles:\n"
+        + json.dumps(records, ensure_ascii=False, indent=2)
+        + "\n"
+    )
+
+
+def _resolve_context_files(selected: tuple[Path, ...], roots: tuple[Path, ...]) -> tuple[Path, ...]:
+    """Validate every selected file before permitting any content reads."""
+    resolved = tuple(path.resolve(strict=True) for path in selected)
+    for source, target in zip(selected, resolved, strict=True):
+        if not any(target.is_relative_to(root) for root in roots):
+            raise RecipeError(f"prepared-context file escapes readable_roots: {source}")
+        if not target.is_file():
+            raise RecipeError(f"prepared-context input is not a regular file: {source}")
+    return resolved

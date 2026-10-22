@@ -7,8 +7,8 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
 ### Added
 
 - Compilers can flag advisory source material with a suitability note for owner
-  review. The note reaches CLI output and compiler traces independently of
-  mechanical compilation and dry-run outcomes (#16).
+  review. Only the final accepted candidate supplies the note to CLI output
+  and compiler traces; terminal control characters are rejected (#16).
 - Worker tool capabilities reach generation, repair, and compiler dry runs.
   Custom adapters can declare supported operations, and agent calls can require
   them before invocation without granting additional permissions (#7).
@@ -18,35 +18,30 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
 
 ### Fixed
 
-- Installed completion guidance requires independently observed checks, full
-  inventory provenance, and executed measurements before claiming measured
-  completion. Neutral regressions distinguish incomplete and empty scope and
-  reject worker completion claims when required host checks fail (#13, #18).
+- Neutral offline workflows exercise complete inventory accounting and
+  independent host checks, required-field rendering, saved delivery, accumulated
+  imports, and explicit build effects (#11–#15, #18). These demonstrate supported
+  authoring patterns; real compiler generation acceptance remains owner-run.
 - Compiler scratch redirection preserves helper-returned paths when chained
   through writes and verification under absolute output roots.
-- Predeclared subprocess outputs remain absent and explicitly unverified after
-  compiler command suppression, so recipes can retain mandatory artifact
-  checks. Incorrect paths and materialized content failures remain errors.
-- Stateful-import guidance requires supported accumulation behavior and a final
-  check against all input evidence; neutral old/new dependency regressions
-  cover replace-by-default imports and lost evidence despite success counters
-  (#15).
-- Installed generation contracts require source-required fields to survive
-  grouped rendering, reconcile final findings and coverage after retries, and
-  verify saved delivery at a trusted destination against the complete intended
-  inventory (#12, #14).
+- Predeclared outputs remain absent and explicitly unverified after suppressed
+  compiler commands or writable stub agents, including wrapped verification
+  errors and direct reads. Incorrect paths and materialized content failures
+  remain errors. Missing default inputs remain identifiable through context errors.
+- Inline script headers preserve encoding declarations on either permitted line,
+  including LF and CRLF source files.
 - Prepared context can gather source files and manifests with resolved readable
   roots, rejecting an escaping selection before reading any contents while
   retaining authorized resources, external inputs, and LF/CRLF content (#9).
+  File bundles use bounded text chunks so spilled contents support line-paged reads.
+  Path collections require tuples in generated code and reject bare strings at runtime.
 - Artifact directory creation can preflight a complete subprocess output set,
   rejecting collisions, symlinked files, and excluded project roots before any
   mkdir or command launch. Explicit replacement respects output override
   protection (#10).
-- Command authoring guidance accounts for implicit target builds and executable
-  configuration, requiring opt-in and isolation for build-capable analysis (#11).
 - Optional command workflows can distinguish launch failures and local timeouts
   through `RecipeError.command_failure`. Generation and repair receive this
-  contract and guidance to preserve fallback environments. Shared-budget
+  contract. Shared-budget
   exhaustion remains fatal; validation and output-limit failures remain errors
   (#8).
 

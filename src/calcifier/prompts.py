@@ -26,8 +26,7 @@ from .recipe_ast import (
 from .recipe_draft import recipe_draft_prompt_contract
 from .skill_frontmatter import declared_allowed_tools
 
-PORTABLE_SOURCE_PROMPT = """You are Calcifier's code-generation pass. Write a Python recipe that
-does the work of the source SKILL.md below, and return it as a {draft_name}.
+PORTABLE_SOURCE_PROMPT = """Write a Python recipe for the source SKILL.md; return a {draft_name}.
 {ir_contract}
 The compiler formats with destination Ruff, checks Ruff and ty against the installed Calcifier API,
 and dry-runs the recipe against stub agents. Return one complete module of at most 250 lines.
@@ -90,11 +89,12 @@ Import only from the Python standard library and `calcifier`. The installed reci
 - Batch complete reference reads for already selected candidates. Preserve source-stated
   ordering and limits; on-demand reads need not be one file per call unless explicitly stated.
 ## Effects and security
-- Gather target files with `prepare_context(files=..., readable_roots=...)`; use UTF-8 Path reads
-  only for other authorized inputs. `open()` is not available. Use `write_text()`, `write_json()`,
-  or `ensure_directory()` under `output_root`. Change the user's project with a supplied program
-  via `run_command()` or agent `writable_paths`. Never mutate files directly (`Path.write_text()`,
-  `Path.replace()`, `os`, `shutil`, `subprocess`). Ordinary string methods are allowed.
+- Use `Path.read_text(encoding="utf-8")` or `read_bytes()` for files Python parses. Use
+  `prepare_context(files=..., readable_roots=...)` for files only agents need.
+  `open()` is not available. Write under `output_root` with `write_text()`, `write_json()`, or
+  `ensure_directory()`. Change projects via `run_command()` or agent `writable_paths`.
+  Never mutate files directly (`Path.write_text()`, `Path.replace()`, `os`, `shutil`, `subprocess`).
+  Ordinary string methods are allowed.
 - Build tool paths, agent `working_directory`, `readable_paths`, `writable_paths`, and commands
   from trusted recipe inputs, never from agent or child-recipe output. Deterministic results
   are trusted; typed judgments may choose trusted branches. Model output may name locations in

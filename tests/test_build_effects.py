@@ -121,10 +121,7 @@ def test_build_opt_in_requires_a_prepared_environment(tmp_path, compiled_wrapper
     assert not result.records[0].side_effects
 
 
-def test_generation_receives_the_effective_command_behavior_contract():
+def test_generation_receives_the_command_isolation_contract():
     prompt = build_prompt("Inspect a target with an optional analyzer.")
 
-    assert "analysis wrappers that compile targets or load executable" in prompt
-    assert "Require explicit recipe input opt-in" in prompt
     assert "mutating=True does not isolate a process" in prompt
-    assert "non-building/manual route" in prompt

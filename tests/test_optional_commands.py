@@ -221,4 +221,3 @@ def test_generation_and_repair_receive_the_installed_command_error_contract():
     assert 'set to "launch" or "timeout"' in prompt
     assert "re-raise other RecipeError" in prompt
     assert "Shared deadline exhaustion raises BudgetExceeded" in prompt
-    assert "complete environment-specific argv prefix" in prompt

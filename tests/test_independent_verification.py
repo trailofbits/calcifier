@@ -7,7 +7,6 @@ import json
 import pytest
 
 from calcifier.artifact import prepare_artifact
-from calcifier.prompts import build_prompt
 from calcifier.recipe import load_recipe
 from calcifier.registry import Registry
 from tests.support.agents import StubProvider
@@ -162,11 +161,3 @@ def test_worker_cannot_claim_success_when_the_checker_inspected_no_files(tmp_pat
     assert "No source files inspected" in (result.error or "")
     observed = next(item.value for item in result.artifacts if item.name == "independent-check")
     assert observed["checked_files"] == 0
-
-
-def test_generation_receives_observed_completion_contracts():
-    prompt = " ".join(build_prompt("Review then verify.").split())
-    assert "rendering, and independent checks" in prompt
-    assert "Completion depends on independently observed required checks" in prompt
-    assert "distinguish empty inputs, blocked work, and unmeasured results" in prompt
-    assert "keep phase history separate from final findings" in prompt

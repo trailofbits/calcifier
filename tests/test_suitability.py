@@ -6,10 +6,16 @@ import json
 
 import pytest
 
+import calcifier.artifact as artifact_module
 import calcifier.cli as cli
 from calcifier.agent_events import AgentActivity
 from calcifier.artifact import prepare_artifact
-from calcifier.compiler_activity import compiler_activity_payload, render_compiler_activity
+from calcifier.compiler_activity import (
+    CompilationLimitError,
+    compiler_activity_payload,
+    render_compiler_activity,
+)
+from calcifier.diagnostics import CalcifyError
 from calcifier.recipe import load_recipe
 from calcifier.recipe_draft import RecipeDraftError, decode_recipe_draft, draft_response
 from calcifier.registry import Registry
@@ -50,6 +56,52 @@ def test_advisory_assessment_cannot_bypass_syntax_checks():
 def test_assessment_has_a_strict_text_contract(note):
     with pytest.raises(RecipeDraftError):
         decode_recipe_draft(payload("value = 1", note))
+
+
+@pytest.mark.parametrize("control", ["\x1b[2K\x1b[1A", "\x00", "\x85", "\x07"])
+def test_assessment_cannot_carry_terminal_controls(control):
+    with pytest.raises(RecipeDraftError, match="control characters"):
+        decode_recipe_draft(payload("value = 1", "Review " + control + " this candidate."))
+
+
+@pytest.mark.parametrize("baseline", [False, True])
+def test_post_compile_failure_clears_the_assessment(tmp_path, monkeypatch, baseline):
+    skill = tmp_path / "SKILL.md"
+    skill.write_bytes(b"# Normalize\nReturn whether the provided target is nonempty.\n")
+    registry = Registry()
+    registry.register(draft_sequence(payload(_GOOD_RECIPE, _NOTE)))
+    if baseline:
+        worker = StubProvider(default="true")
+        worker.name = "worker"
+        registry.register(worker)
+    activity = AgentActivity()
+    compile_source = artifact_module.compile_source
+    remaining = artifact_module.CompilerDeadline.remaining
+    accepted = False
+
+    def compile(context):
+        nonlocal accepted
+        result = compile_source(context)
+        assert activity.suitability_note == _NOTE
+        accepted = True
+        if baseline:
+            skill.write_bytes(b"# Changed during compilation\n")
+        return result
+
+    def expire(deadline):
+        if accepted:
+            raise CompilationLimitError("exhausted after source acceptance")
+        return remaining(deadline)
+
+    monkeypatch.setattr(artifact_module, "compile_source", compile)
+    monkeypatch.setattr(artifact_module.CompilerDeadline, "remaining", expire)
+    with pytest.raises(CalcifyError, match="changed|exhausted"):
+        prepare_artifact(skill, registry, activity=activity)
+
+    assert accepted
+    assert activity.suitability_note is None
+    assert "owner review required" not in render_compiler_activity(activity)
+    assert compiler_activity_payload(activity)["suitability_note"] is None
 
 
 def registry_for(*drafts):
