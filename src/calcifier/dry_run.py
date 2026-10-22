@@ -47,7 +47,7 @@ from .registry import Registry
 from .skill_package import ResourceEntry, discover_resources
 from .subprocesses import ProcessError, run_process
 from .tools import Capability, ToolRegistry
-from .trace import DryRunMode, RunHooks, current_frame
+from .trace import DryRunMode, OutputWrites, RunHooks, current, current_frame
 
 _TIMEOUT_SECONDS = 120
 _OUTPUT_LIMIT = 1024 * 1024
@@ -97,27 +97,13 @@ def dry_run_recipe(
     with tempfile.TemporaryDirectory(prefix="calcifier-dry-run-") as directory:
         candidate = Path(directory) / "candidate.py"
         candidate.write_text(_staged_source(source, skill_path), encoding="utf-8", newline="\n")
-        argv = [
-            sys.executable,
-            "-m",
-            "calcifier.dry_run",
-            str(candidate),
-            str(skill_path),
-            str(recipe_path),
-        ]
-        if resource_entries is not None or agent_capabilities is not None:
-            entries = (
-                discover_resources(skill_path) if resource_entries is None else resource_entries
-            )
-            manifest = Path(directory) / "resources.json"
-            manifest.write_text(json.dumps([asdict(entry) for entry in entries]), encoding="utf-8")
-            argv.append(str(manifest))
-        if agent_capabilities is not None:
-            capabilities_path = Path(directory) / "agent-capabilities.json"
-            capabilities_path.write_text(
-                json.dumps(agent_capabilities), encoding="utf-8", newline="\n"
-            )
-            argv.append(str(capabilities_path))
+        argv = _candidate_argv(
+            candidate,
+            skill_path,
+            recipe_path,
+            resource_entries,
+            agent_capabilities=agent_capabilities,
+        )
         try:
             result = run_process(
                 argv,
@@ -140,6 +126,34 @@ def dry_run_recipe(
     except (IndexError, json.JSONDecodeError, KeyError, TypeError):
         detail = result.stderr_tail.decode(errors="replace").strip()
         return DryRunResult("failed", None, f"dry run crashed: {detail or 'no result'}")
+
+
+def _candidate_argv(
+    candidate: Path,
+    skill_path: Path,
+    recipe_path: Path,
+    resource_entries: tuple[ResourceEntry, ...] | None,
+    *,
+    agent_capabilities: dict[str, tuple[str, ...] | None] | None,
+) -> list[str]:
+    argv = [
+        sys.executable,
+        "-m",
+        "calcifier.dry_run",
+        str(candidate),
+        str(skill_path),
+        str(recipe_path),
+    ]
+    if resource_entries is not None or agent_capabilities is not None:
+        entries = discover_resources(skill_path) if resource_entries is None else resource_entries
+        manifest = candidate.parent / "resources.json"
+        manifest.write_text(json.dumps([asdict(entry) for entry in entries]), encoding="utf-8")
+        argv.append(str(manifest))
+    if agent_capabilities is not None:
+        path = candidate.parent / "agent-capabilities.json"
+        path.write_text(json.dumps(agent_capabilities), encoding="utf-8", newline="\n")
+        argv.append(str(path))
+    return argv
 
 
 def _staged_source(source: str, skill_path: Path) -> str:
@@ -231,7 +245,12 @@ def _run(
     ):
         workspace = Path(directory)
         result = _run_in_workspace(
-            candidate, skill_path, workspace, hooks, resource_entries, agent_capabilities
+            candidate,
+            skill_path,
+            workspace,
+            hooks,
+            resource_entries,
+            agent_capabilities=agent_capabilities,
         )
         placeholders = {str(workspace.resolve()): "<workspace>", str(workspace): "<workspace>"}
     placeholders |= {str(candidate.resolve()): "<recipe>", str(candidate): "<recipe>"}
@@ -244,22 +263,15 @@ def _run_in_workspace(
     workspace: Path,
     hooks: RunHooks,
     resource_entries: tuple[ResourceEntry, ...] | None,
+    *,
     agent_capabilities: dict[str, tuple[str, ...] | None] | None = None,
 ) -> DryRunResult:
     try:
         recipe = load_recipe(candidate)
     except (RecipeError, SyntaxError) as exc:
         return DryRunResult("failed", None, f"{type(exc).__name__}: {exc}")
-    entries = discover_resources(skill_path) if resource_entries is None else resource_entries
-    recipe.skill_root = skill_path.parent
-    recipe.skill_path = skill_path
-    if not recipe.skill_sha256:
-        recipe.skill_sha256 = sha256_hex(skill_path.read_bytes())
-    recipe.resources = tuple((entry.path, entry.sha256, entry.source) for entry in entries)
+    _prepare_workspace(recipe, skill_path, workspace, resource_entries)
     text_root = workspace / STUB_TEXT
-    text_root.mkdir(exist_ok=True)
-    for root in (workspace, text_root):
-        (root / "example.txt").write_bytes(b"example\n")
     inputs = _inputs(recipe, workspace)
     if inputs is None:
         return DryRunResult("unverified", None, "a required recipe input cannot be synthesized")
@@ -284,10 +296,30 @@ def _run_in_workspace(
         command_gap=command_gap,
         artifact_gap=artifact_gap,
     )
+    output_writes = OutputWrites()
     outcome = _outcome(
-        _execute(recipe, inputs, hooks, agent_capabilities), missing_input_roots=missing_roots
+        _execute(recipe, inputs, hooks, agent_capabilities, output_writes=output_writes),
+        missing_input_roots=missing_roots,
+        unmaterialized_outputs=output_writes.unmaterialized,
     )
     return _with_gaps(outcome, gaps, artifact_gaps)
+
+
+def _prepare_workspace(
+    recipe: Recipe,
+    skill_path: Path,
+    workspace: Path,
+    resource_entries: tuple[ResourceEntry, ...] | None,
+) -> None:
+    entries = discover_resources(skill_path) if resource_entries is None else resource_entries
+    recipe.skill_root = skill_path.parent
+    recipe.skill_path = skill_path
+    if not recipe.skill_sha256:
+        recipe.skill_sha256 = sha256_hex(skill_path.read_bytes())
+    recipe.resources = tuple((entry.path, entry.sha256, entry.source) for entry in entries)
+    for root in (workspace, workspace / STUB_TEXT, workspace / "input"):
+        root.mkdir(exist_ok=True)
+        (root / "example.txt").write_bytes(b"example\n")
 
 
 def _with_gaps(
@@ -321,7 +353,10 @@ def _command_input_gap(
         try:
             path = Path(value)
             resolved = (base / path).resolve()
-            if resolved in {workspace / STUB_TEXT, workspace / STUB_TEXT / "example.txt"}:
+            if any(
+                resolved in {root, root / "example.txt"}
+                for root in (workspace / STUB_TEXT, workspace / "input")
+            ):
                 return True
             if not resolved.exists() and any(resolved.is_relative_to(root) for root in roots):
                 return True
@@ -404,7 +439,7 @@ def _input_value(annotation: Any, workspace: Path) -> Any:
         values = [_input_value(element, workspace) for element in elements]
         return None if any(value is None for value in values) else origin(values)
     if annotation is Path:
-        return workspace
+        return workspace / "input"
     if annotation is bool:
         return False
     if annotation in {int, float}:
@@ -418,6 +453,8 @@ def _execute(
     inputs: dict[str, Any],
     hooks: RunHooks,
     agent_capabilities: dict[str, tuple[str, ...] | None] | None = None,
+    *,
+    output_writes: OutputWrites | None = None,
 ) -> RecipeRun:
     roles, capabilities = recipe.agent_names, recipe.capabilities
     if recipe.composed:
@@ -435,11 +472,21 @@ def _execute(
     for name in capabilities:
         tools.register(Capability(name, "dry-run"), _EmptyTool())
     return recipe._execute(
-        inputs, registry=registry, tool_registry=tools, dry_run=DryRunMode.SOFT, _hooks=hooks
+        inputs,
+        registry=registry,
+        tool_registry=tools,
+        dry_run=DryRunMode.SOFT,
+        _hooks=hooks,
+        _output_writes=output_writes,
     )
 
 
-def _outcome(run: RecipeRun, *, missing_input_roots: tuple[Path, ...] = ()) -> DryRunResult:
+def _outcome(
+    run: RecipeRun,
+    *,
+    missing_input_roots: tuple[Path, ...] = (),
+    unmaterialized_outputs: set[Path] | None = None,
+) -> DryRunResult:
     writes = _file_writes(run.records)
     if run.ok:
         return DryRunResult("passed", writes=writes)
@@ -448,7 +495,10 @@ def _outcome(run: RecipeRun, *, missing_input_roots: tuple[Path, ...] = ()) -> D
     if (
         STUB_REJECTED in error
         or run.exception is None
-        or run.error_type == "UnmaterializedArtifactError"
+        or any(
+            exc.type_name == "UnmaterializedArtifactError"
+            for exc in (run.exception, *run.exception.causes)
+        )
     ):
         return DryRunResult("unverified", step, error, writes)
     detail = located or error
@@ -456,7 +506,15 @@ def _outcome(run: RecipeRun, *, missing_input_roots: tuple[Path, ...] = ()) -> D
     if location is not None:
         source = f": {location.source}" if location.source else ""
         detail = f"{detail} (line {location.line}{source})"
-    if _missing_input(run, missing_input_roots):
+    if _missing_file(run, paths=unmaterialized_outputs):
+        return DryRunResult(
+            "unverified",
+            step,
+            f"declared output is unavailable after a suppressed effect: {detail}; "
+            "saved content and downstream checks remain unverified",
+            writes,
+        )
+    if _missing_file(run, roots=missing_input_roots):
         return DryRunResult(
             "unverified",
             step,
@@ -467,17 +525,24 @@ def _outcome(run: RecipeRun, *, missing_input_roots: tuple[Path, ...] = ()) -> D
     return DryRunResult("failed", step, detail, writes)
 
 
-def _missing_input(run: RecipeRun, roots: tuple[Path, ...]) -> bool:
-    if run.error_type != "FileNotFoundError" or run.exception is None:
+def _missing_file(
+    run: RecipeRun,
+    *,
+    roots: tuple[Path, ...] = (),
+    paths: set[Path] | None = None,
+) -> bool:
+    if run.exception is None:
         return False
-    filename = run.exception.filename
-    if filename is None:
-        return False
-    try:
-        path = Path(filename).resolve()
-        return any(path.is_relative_to(root) for root in roots)
-    except (OSError, ValueError):
-        return False
+    for exc in (run.exception, *run.exception.causes):
+        if exc.type_name != "FileNotFoundError" or exc.filename is None:
+            continue
+        try:
+            path = Path(exc.filename).resolve()
+            if path in (paths or ()) or any(path.is_relative_to(root) for root in roots):
+                return True
+        except (OSError, ValueError):
+            continue
+    return False
 
 
 def _file_writes(records: list[Any]) -> tuple[str, ...]:
@@ -552,7 +617,15 @@ class _SchemaStub(AgentProvider):
         filesystem: FilesystemContract | None = None,
         schema: dict[str, Any] | None = None,
     ) -> AgentResult:
-        del prompt, timeout, filesystem
+        del prompt, timeout
+        ctx = current()
+        if ctx is not None and filesystem is not None:
+            with ctx.output_writes.lock:
+                ctx.output_writes.unmaterialized.update(
+                    path
+                    for path in ctx.output_writes.planned
+                    if any(path.is_relative_to(root) for root in filesystem.writable_paths)
+                )
         text = STUB_TEXT if schema is None else json.dumps(synthesize(schema))
         return AgentResult(text, text, "", 0, self.name)
 

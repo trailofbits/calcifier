@@ -640,14 +640,9 @@ class Recipe:
                 record.error = str(exc)
             except Exception as exc:  # noqa: BLE001 — recipes get faithful errors
                 record.error = f"{type(exc).__name__}: {exc}"
-                record.exception = RunException(
-                    type(exc).__name__,
-                    _exception_location(exc, Path(self.fn.__code__.co_filename)),
-                    filename=(
-                        exc.filename
-                        if isinstance(exc, FileNotFoundError) and isinstance(exc.filename, str)
-                        else None
-                    ),
+                record.exception = RunException.capture(
+                    exc,
+                    location=_exception_location(exc, Path(self.fn.__code__.co_filename)),
                 )
                 # gremlin: pardon[equivalent] exc_info flag affects logger side effect only
                 logger.debug("recipe %s raised", self.name, exc_info=True)

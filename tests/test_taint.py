@@ -84,6 +84,46 @@ def run(root):
     assert "an output preflight path" in findings[0].actual
 
 
+@pytest.mark.parametrize(
+    "call,sink",
+    [
+        (
+            'prepare_context("review", **{"files": (answer,), "readable_roots": (root,)})',
+            "a prepared-context file read",
+        ),
+        (
+            'prepare_context("review", **{"files": (root,), "readable_roots": (answer,)})',
+            "a prepared-context file read",
+        ),
+        ('ensure_directory(".", **{"output_files": (answer,)})', "an output preflight path"),
+        ('ensure_directory(".", **{"exclude_roots": (answer,)})', "an output preflight path"),
+        ('prepare_context("review", **options)', "a prepared-context file read"),
+        ('ensure_directory(".", **options)', "an output preflight path"),
+    ],
+)
+def test_unpacking_cannot_hide_context_and_preflight_path_sinks(call, sink):
+    findings = _errors(f"""
+def run(root, options):
+    answer = agent("worker", "answer", working_directory=root)
+    return {call}
+""")
+    assert len(findings) == 1
+    assert sink in findings[0].actual
+
+
+def test_unpacked_context_data_can_remain_tainted_with_trusted_paths():
+    assert (
+        _errors("""
+def run(root):
+    answer = agent("worker", "answer", working_directory=root)
+    return prepare_context("review", **{
+        "files": (root,), "readable_roots": (root,), "prior_results": answer,
+    })
+""")
+        == []
+    )
+
+
 def test_model_text_remains_usable_as_context_data_with_trusted_file_paths():
     assert (
         _errors("""

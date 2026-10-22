@@ -52,8 +52,9 @@ def attach_script_metadata(source: str, python_version: str | None = None) -> st
     prefix = 0
     if lines and lines[0].startswith("#!"):
         prefix = 1
-    if len(lines) > prefix and re.match(r"#.*coding[:=]\s*[-\w.]+", lines[prefix]):
-        prefix += 1
+    for index, line in enumerate(lines[:2]):
+        if re.match(r"[ \t\f]*#.*coding[:=]\s*[-\w.]+", line):
+            prefix = index + 1
     return "".join(lines[:prefix]) + header + "".join(lines[prefix:]).lstrip("\r\n")
 
 

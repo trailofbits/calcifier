@@ -120,7 +120,7 @@ def test_required_inputs_are_synthesized_by_annotation(
     value = dry_run._input_value(annotation, tmp_path)
 
     if expected == "workspace":
-        assert value == tmp_path
+        assert value == tmp_path / "input"
     elif expected == "text":
         assert value == "stub"
     else:
@@ -429,7 +429,7 @@ _WRITER = textwrap.dedent(
 
 @pytest.mark.parametrize(
     ("annotation", "write"),
-    [("str", "<workspace>/stub/entry.md"), ("Path", "<workspace>/entry.md")],
+    [("str", "<workspace>/stub/entry.md"), ("Path", "<workspace>/input/entry.md")],
 )
 def test_a_relative_output_root_is_the_dry_run_workspace(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, annotation: str, write: str
@@ -445,7 +445,7 @@ def test_a_relative_output_root_is_the_dry_run_workspace(
 
 @pytest.mark.parametrize(
     ("annotation", "missing"),
-    [("str", Path("stub/missing.md")), ("Path", "<workspace>/missing.md")],
+    [("str", Path("stub/missing.md")), ("Path", "<workspace>/input/missing.md")],
 )
 def test_dry_run_errors_name_the_workspace_instead_of_its_temporary_path(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, annotation: str, missing: str | Path
