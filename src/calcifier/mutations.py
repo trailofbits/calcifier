@@ -266,7 +266,7 @@ def verify_artifact(
         and target in ctx.output_writes.unmaterialized
     ):
         error = (
-            f"declared output is unavailable after a suppressed command: {target}; "
+            f"declared output is unavailable after a suppressed command or agent write: {target}; "
             "saved content and downstream checks remain unverified"
         )
         if ctx.hooks.artifact_gap is not None:

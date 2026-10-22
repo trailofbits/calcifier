@@ -74,6 +74,19 @@ def test_metadata_shaped_string_data_is_preserved():
     assert ast.literal_eval(result.value) == ast.literal_eval(original.value)
 
 
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_second_line_encoding_cookie_stays_in_the_first_two_lines(newline):
+    prefix = newline.join(("# Generated recipe", "# -*- coding: utf-8 -*-", ""))
+    program = f'VALUE = "caf\u00e9"{newline}'
+
+    stamped = attach_script_metadata(prefix + program)
+
+    expected = prefix + attach_script_metadata(program)
+    assert stamped.encode("utf-8") == expected.encode("utf-8")
+    assert stamped.splitlines()[1] == "# -*- coding: utf-8 -*-"
+    assert attach_script_metadata(stamped) == stamped
+
+
 def test_source_compilation_has_runner_requirements():
     source = calcify_source("Return whether a target was supplied.", one_draft(_GOOD_RECIPE))
 

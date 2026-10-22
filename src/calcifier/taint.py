@@ -595,14 +595,12 @@ def _tainted_sink(call: ast.Call, flow: _Flow, names: set[str]) -> str | None:
         if any(node is not None and flow.tainted(node, names) for node in (argv, cwd)):
             return "a command"
         return None
-    if target == "calcifier.prepare_context" and any(
-        name in {"files", "readable_roots"} and flow.tainted(value, names)
-        for name, value in keywords.items()
+    if target == "calcifier.prepare_context" and _tainted_keywords(
+        call.keywords, {"files", "readable_roots"}, flow, names
     ):
         return "a prepared-context file read"
-    if target == "calcifier.ensure_directory" and any(
-        name in {"output_files", "exclude_roots"} and flow.tainted(value, names)
-        for name, value in keywords.items()
+    if target == "calcifier.ensure_directory" and _tainted_keywords(
+        call.keywords, {"output_files", "exclude_roots"}, flow, names
     ):
         return "an output preflight path"
     if target in _TOOLS | {"calcifier.agent"} and any(
@@ -611,3 +609,24 @@ def _tainted_sink(call: ast.Call, flow: _Flow, names: set[str]) -> str | None:
     ):
         return "an agent filesystem contract" if target == "calcifier.agent" else "a tool path"
     return None
+
+
+def _tainted_keywords(
+    keywords: list[ast.keyword],
+    sinks: set[str],
+    flow: _Flow,
+    names: set[str],
+) -> bool:
+    for keyword in keywords:
+        if keyword.arg is not None:
+            if keyword.arg in sinks and flow.tainted(keyword.value, names):
+                return True
+        elif not isinstance(keyword.value, ast.Dict):
+            return True  # An opaque mapping can supply any filesystem keyword.
+        else:
+            for key, value in zip(keyword.value.keys, keyword.value.values, strict=True):
+                if not isinstance(key, ast.Constant) or not isinstance(key.value, str):
+                    return True
+                if key.value in sinks and flow.tainted(value, names):
+                    return True
+    return False

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pprint
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 from . import trace as _trace
@@ -20,6 +20,26 @@ class RunException:
     type_name: str
     location: ErrorLocation | None = None
     filename: str | None = None
+    causes: tuple[RunException, ...] = ()
+
+    @classmethod
+    def capture(cls, exc: BaseException, *, location: ErrorLocation | None = None) -> RunException:
+        """Retain explicit causes without keeping exceptions or traceback frames alive."""
+        causes: list[RunException] = []
+        seen: set[int] = set()
+        current: BaseException | None = exc
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+            causes.append(
+                cls(
+                    type(current).__name__,
+                    filename=current.filename
+                    if isinstance(current, FileNotFoundError) and isinstance(current.filename, str)
+                    else None,
+                )
+            )
+            current = current.__cause__
+        return replace(causes[0], location=location, causes=tuple(causes[1:]))
 
 
 @dataclass
