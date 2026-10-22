@@ -38,14 +38,26 @@ if __name__ == "__main__":
     assert not (tmp_path / "artifacts").exists()
 
 
-def test_required_path_input_does_not_enclose_relative_output_directory(tmp_path):
-    source = """from pathlib import Path
+@pytest.mark.parametrize(
+    ("output_root", "directory"),
+    [
+        ("calcifier-output", "reports"),
+        ("input", "reports"),
+        ("input/reports", "reports"),
+        (".", "input"),
+    ],
+)
+def test_required_path_input_does_not_enclose_relative_output_directory(
+    tmp_path, output_root, directory
+):
+    source = f"""from pathlib import Path
 from calcifier import ensure_directory, recipe
 
-@recipe(output_root="calcifier-output")
+@recipe(output_root={output_root!r})
 def workflow(project: Path) -> str:
     assert (project / "example.txt").is_file()
-    return str(ensure_directory("reports", output_files=("raw.json",), exclude_roots=(project,)))
+    return str(ensure_directory({directory!r}, output_files=("raw.json",),
+                                exclude_roots=(project,)))
 
 if __name__ == "__main__":
     raise SystemExit(workflow.cli())
@@ -61,7 +73,7 @@ if __name__ == "__main__":
     result = load_recipe(candidate).run({"project": project}, output_directory=output)
     assert result.ok
     assert isinstance(result.output, str)
-    assert Path(result.output) == output / "reports"
+    assert Path(result.output) == output / directory
 
 
 @pytest.mark.parametrize("suppressed", [False, True])
