@@ -113,6 +113,8 @@ def prepare_artifact(  # noqa: C901 - baseline preparation and compiler improvem
     with a baseline, eight without). ``optimize=False`` prepares only the baseline.
     Invalid inputs or failure without a usable baseline raise CalcifyError.
     """
+    activity = activity or AgentActivity()
+    activity.suitability_note = None
     if max_compiler_calls is not None and (
         type(max_compiler_calls) is not int or not 1 <= max_compiler_calls <= _MAX_COMPILER_CALLS
     ):
@@ -164,7 +166,6 @@ def prepare_artifact(  # noqa: C901 - baseline preparation and compiler improvem
         baseline = PreparedArtifact(
             target, _checked_artifact(source, target, python_version), "baseline_retained"
         )
-    activity = activity or AgentActivity()
     if baseline is not None:
         activity.record_event("baseline", "prepared")
     if not optimize:
@@ -221,6 +222,7 @@ def prepare_artifact(  # noqa: C901 - baseline preparation and compiler improvem
         )
         deadline.remaining()
     except CalcifyError as exc:
+        activity.suitability_note = None
         if baseline is None:
             raise
         # A rejected improvement cannot make a stale baseline publishable.
@@ -232,7 +234,6 @@ def prepare_artifact(  # noqa: C901 - baseline preparation and compiler improvem
             stage_compiler_resources(Path(directory), skill_path, skill_text, tuple(resources))
         activity.outcome = baseline.outcome
         activity.retained_reason = str(exc)
-        activity.suitability_note = None
         activity.dry_run = baseline.dry_run
         activity.record_event("baseline", "retained", detail=str(exc))
         logger.warning("Compiler improvement rejected; retaining baseline: %s", exc)

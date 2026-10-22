@@ -76,14 +76,18 @@ structured record; a custom renderer must select and display all fields required
 by the source for every applicable record. Schema validation alone does not
 check the rendered report.
 
-For source files and manifests, use `prepare_context(..., files=selected_files,
+For files Python parses, use `Path.read_text(encoding="utf-8")` or `read_bytes()`.
+For files only agents need, use `prepare_context(..., files=selected_files,
 readable_roots=(project,))`. It resolves and validates the entire selection
 before reading any contents, rejecting files outside those roots, including
 escaping symlinks. Internal symlinks remain valid. Include an external input's
 root or exact path explicitly when the workflow authorizes it; pinned
 `resource()` paths can be authorized the same way. Complete UTF-8 contents are
 saved with their original line endings; the embedding budget does not truncate
-the saved bundle. This helper enforces the declared selection, not a sandbox
+the saved bundle. File contents are stored as bounded JSON text chunks, with
+instructions to concatenate them without separators, so even a long source line
+can be read in pages. Pass tuples for `files` and `readable_roots`.
+This helper enforces the declared selection, not a sandbox
 around arbitrary trusted Python reads.
 
 ## Effects

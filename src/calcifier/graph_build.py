@@ -170,6 +170,7 @@ def build_graph(
     built: dict[str, str] = {}
     timings = {}
     baseline_nodes: list[str] = []
+    assessments: dict[str, str | None] = {}
 
     def compile_node(name: str, *, optimize: bool = True) -> PreparedArtifact:
         node = spec["nodes"][name]
@@ -191,12 +192,7 @@ def build_graph(
             resource_sources=node["resources"],
             optimize=optimize,
         )
-        if artifact.suitability_note:
-            logger.warning(
-                "%s: owner suitability review required (compiler assessment): %s",
-                name,
-                artifact.suitability_note,
-            )
+        assessments[name] = artifact.suitability_note
         return artifact
 
     for name in build_order(spec["nodes"]):
@@ -228,7 +224,17 @@ def build_graph(
     else:
         _check_built_graph(spec, staging)
     staging.rename(destination)
-    return _write_catalog(spec, destination)
+    catalog = _write_catalog(spec, destination)
+    _report_assessments(assessments)
+    return catalog
+
+
+def _report_assessments(assessments: dict[str, str | None]) -> None:
+    for name, note in assessments.items():
+        if note:
+            logger.warning(
+                "%s: owner suitability review required (compiler assessment): %s", name, note
+            )
 
 
 def _write_catalog(spec: dict[str, Any], destination: Path) -> Path:

@@ -7,6 +7,7 @@ import io
 import json
 import re
 import tokenize
+import unicodedata
 import warnings
 from typing import Literal, cast
 
@@ -164,10 +165,13 @@ def decode_recipe_draft(text: str, *, python_version: str | None = None) -> Reci
         raise RecipeDraftError(f"invalid or incomplete recipe draft: {exc}") from exc
     check_recipe_syntax(module)
     _reject_type_check_suppression(draft.source, module)
+    note = draft.suitability_note or ""
+    if any(unicodedata.category(character) == "Cc" for character in note):
+        raise RecipeDraftError("suitability_note cannot contain control characters")
     return RecipeDraft(
         version=draft.version,
         source=draft.source if draft.source.endswith("\n") else draft.source + "\n",
-        suitability_note=(draft.suitability_note or "").strip() or None,
+        suitability_note=note.strip() or None,
     )
 
 

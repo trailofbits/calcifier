@@ -12,6 +12,22 @@ from calcifier.trace import DryRunMode, RunHooks
 from tests.support.compiler import one_draft
 
 _OUTPUTS = ("raw.json", "summary.md", "report.md")
+
+
+@pytest.mark.parametrize("name", ["output_files", "exclude_roots"])
+@pytest.mark.parametrize("value", ["out", b"out"])
+def test_bare_path_collections_fail_before_creating_outputs(tmp_path, name, value):
+    @recipe(output_root=str(tmp_path / "destination"))
+    def workflow() -> str:
+        return str(ensure_directory(**{name: value}))
+
+    result = workflow.run()
+
+    assert not result.ok
+    assert f"{name} must be" in (result.error or "")
+    assert not (tmp_path / "destination").exists()
+
+
 _SOURCE = """import sys
 from pathlib import Path
 from calcifier import ensure_directory, recipe, resource, run_command, step

@@ -260,12 +260,6 @@ def fail(reason: str) -> NoReturn:
     """Abort the running recipe with ``reason``.
 
     ``Recipe.run()`` captures this as a failed result with a user-facing message.
-    Completion depends on independently observed required checks and complete input
-    coverage, not an agent's completed flag. Preserve enumeration provenance: exhaust
-    pages or report capped/truncated scope as incomplete. When claiming measured
-    effectiveness, require observed execution; distinguish empty inputs, blocked work,
-    and unmeasured results from a completed measurement. Apply the source's actual
-    requirements without inventing thresholds or replacing qualitative judgments.
     """
     raise RecipeFailure(reason)
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -25,7 +26,43 @@ def symlink(link: Path, target: Path) -> None:
 
 def files_in(context) -> list[dict[str, str]]:
     contents = (Path(context.directory) / "task.txt").read_text(encoding="utf-8")
-    return json.loads(contents.split("\nFiles:\n", 1)[1])
+    return [
+        {"path": record["path"], "text": "".join(record["text_chunks"])}
+        for record in json.loads(contents.split("\nFiles:\n", 1)[1])
+    ]
+
+
+@pytest.mark.parametrize("newline", [b"\n", b"\r\n", b""])
+def test_spilled_file_context_is_complete_and_line_pageable(tmp_path, newline):
+    source = tmp_path / "source.txt"
+    contents = (b"caf\xc3\xa9 " * 60 + newline) * 500
+    source.write_bytes(contents)
+
+    with prepared_context_run():
+        context = prepare_context(
+            "Read the entire file.", files=(source,), readable_roots=(tmp_path,), byte_budget=1024
+        )
+        bundle = (Path(context.directory) / "task.txt").read_bytes()
+        assert "Files:" not in context.prompt
+        assert max(map(len, bundle.splitlines())) <= 2000
+        assert files_in(context) == [{"path": str(source), "text": contents.decode("utf-8")}]
+
+
+@pytest.mark.parametrize("name", ["files", "readable_roots"])
+@pytest.mark.parametrize("value", ["out", b"out"])
+def test_context_rejects_bare_path_collections_before_reading(tmp_path, monkeypatch, name, value):
+    reads = []
+    monkeypatch.setattr(Path, "read_bytes", lambda path: reads.append(path))
+    arguments: dict[str, Any] = {
+        "files": (tmp_path / "source.txt",),
+        "readable_roots": (tmp_path,),
+        name: value,
+    }
+
+    with prepared_context_run(), pytest.raises(TypeError, match=name):
+        prepare_context("Read selected inputs.", **arguments)
+
+    assert reads == []
 
 
 @pytest.mark.parametrize("newline", [b"\n", b"\r\n"])

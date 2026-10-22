@@ -111,12 +111,8 @@ def output_type[T](
     failure indicator beside apparently successful required fields. Decorated
     records also expose ``model_dump()`` and ``model_dump_json()`` so portable
     recipes can serialize structured agent output without importing Pydantic.
-    Preserve every source-required field through deterministic rendering, regardless
-    of grouping or category. A valid record does not establish that its final report
-    retains those values; render required fields for every applicable record.
-    When the source requires a reconciled final result, derive it after validation
-    and retries; keep phase history separate from final findings and explicitly
-    account for inputs that remain unprocessed or incomplete.
+    Validation covers the declared structured values; it does not validate rendered
+    report contents or semantic completeness.
     """
 
     def decorate(target: type[T]) -> type[T]:

@@ -123,6 +123,32 @@ def test_build_reports_per_node_suitability_assessments(tmp_path, monkeypatch, c
     assert f"entry: owner suitability review required (compiler assessment): {note}" in caplog.text
 
 
+def test_discarded_graph_candidate_does_not_emit_a_suitability_warning(
+    tmp_path, monkeypatch, caplog
+):
+    spec = _spec(tmp_path)
+    calls = []
+    note = "Review the extraction usefulness of this candidate."
+
+    def prepare(skill, registry, *, output, optimize, **kwargs):
+        calls.append((output.name, optimize))
+        compiled = output.name == "worker.py" and optimize
+        return PreparedArtifact(
+            output,
+            "from calcifier import recipe\n@recipe\ndef workflow() -> str:\n    return 'ok'\n",
+            outcome="compiled" if compiled else "baseline_retained",
+            suitability_note=note if compiled else None,
+        )
+
+    monkeypatch.setattr("calcifier.graph_build.prepare_artifact", prepare)
+
+    assert build_graph(spec, Registry()).exists()
+    assert calls == [("worker.py", True), ("entry.py", True), ("worker.py", False)]
+    assert "retained baseline workflows" in caplog.text
+    assert "owner suitability review required" not in caplog.text
+    assert note not in caplog.text
+
+
 def test_build_compiles_dependencies_and_publishes_a_pinned_catalog(tmp_path, monkeypatch):
     spec = _spec(tmp_path)
     calls = _compiler(monkeypatch, tmp_path)

@@ -70,8 +70,8 @@ def test_build_prompt_states_the_recipe_shape_and_effect_rules():
     assert "Use ordinary bounded loops" in prompt
     assert "`fail()` after exhaustion" in prompt
     assert "`Path.replace()`" in prompt
-    assert "Gather target files with `prepare_context(files=..., readable_roots=...)`" in prompt
-    assert "use UTF-8 Path reads only for other authorized inputs" in prompt
+    assert '`Path.read_text(encoding="utf-8")` or `read_bytes()` for files Python parses' in prompt
+    assert "`prepare_context(files=..., readable_roots=...)` for files only agents need" in prompt
     assert "`open()` is not available" in prompt
     assert "When it calls agents" in prompt
     assert "counts every agent() call the recipe can make" in prompt
