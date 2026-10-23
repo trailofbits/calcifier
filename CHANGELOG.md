@@ -1,8 +1,9 @@
 # Changelog
 
-## v0.2.0 — Unreleased
+## v0.2.0 — 2026-10-23
 
-Development is tracked in the [release plan](docs/releases/v0.2.0.md).
+See the [release notes](docs/releases/v0.2.0.md) for contracts, validation limits,
+and remaining generation work.
 
 ### Added
 
@@ -18,10 +19,6 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
 
 ### Fixed
 
-- Neutral offline workflows exercise complete inventory accounting and
-  independent host checks, required-field rendering, saved delivery, accumulated
-  imports, and explicit build effects (#11–#15, #18). These demonstrate supported
-  authoring patterns; real compiler generation acceptance remains owner-run.
 - Compiler scratch redirection preserves helper-returned paths when chained
   through writes and verification under absolute output roots.
 - Predeclared outputs remain absent and explicitly unverified after suppressed
@@ -41,9 +38,18 @@ Development is tracked in the [release plan](docs/releases/v0.2.0.md).
   protection (#10).
 - Optional command workflows can distinguish launch failures and local timeouts
   through `RecipeError.command_failure`. Generation and repair receive this
-  contract. Shared-budget
-  exhaustion remains fatal; validation and output-limit failures remain errors
-  (#8).
+  contract. Shared-budget exhaustion remains fatal; validation and output-limit
+  failures remain errors (#8).
+
+### Validation and remaining work
+
+- Neutral offline workflows exercise complete inventory accounting and
+  independent host checks, required-field rendering, saved delivery, accumulated
+  imports, and explicit build effects (#11–#15, #18). These demonstrate supported
+  authoring patterns; they do not establish that real compilers generate them.
+- Live generation and end-to-end acceptance have not been performed for this
+  release. The remaining generation issues stay open for follow-up; owner
+  acceptance is not a prerequisite for publishing v0.2.0.
 
 ## v0.1.1 — 2026-10-14
 
