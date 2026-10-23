@@ -455,7 +455,7 @@ def test_worker_keeps_result_when_temporary_cleanup_is_busy(tmp_path, monkeypatc
 
     expected = WorkerResult("example", GremlinResultStatus.SURVIVED)
 
-    def busy_cleanup(path, *, onexc):
+    def busy_cleanup(path, *, onexc, **_kwargs):
         # Inject the filesystem error at rmtree's callback boundary. Patching
         # os.rmdir globally exercises different recursive retries on each OS.
         try:
