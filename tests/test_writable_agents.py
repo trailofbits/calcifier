@@ -170,6 +170,8 @@ def test_codex_writable_roots_exclude_readable_only_paths(tmp_path: Path, nested
         "computer_use",
         "-c",
         "project_doc_max_bytes=0",
+        "-c",
+        'cli_auth_credentials_store="file"',
         "-C",
         str(cwd),
         "--add-dir",

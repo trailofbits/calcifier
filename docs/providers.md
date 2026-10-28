@@ -57,6 +57,19 @@ changes. Bash and permission prompts are unavailable. Codex uses `read-only` or
 Its network access is off by default and `/tmp` is excluded from writable roots;
 the per-user temporary directory remains available.
 
+Codex authentication is read from the original `CODEX_HOME` (default `~/.codex`).
+Calcifier honors `cli_auth_credentials_store`: `file` copies `auth.json`, `keyring`
+reads the home-specific OS credential entry, and `auto` tries the keyring before
+falling back to the file. Keychain on macOS, Secret Service on Linux, and Windows
+Credential Manager are supported. Only authentication is staged in a private
+temporary home with a mode-0600 `auth.json`; the child uses file storage and the
+temporary home is removed after the call. Other user settings are not copied.
+`OPENAI_API_KEY` remains in the child environment.
+Process-only `ephemeral` credentials cannot be transferred to a new CLI process.
+Unlock the OS credential store and check `codex login status` if keyring access
+fails. Token refreshes in the temporary home are not written back to the original
+credential store.
+
 Recipe Python, host commands, and tool providers still run with host permissions.
 Custom adapters must enforce the filesystem contract themselves. VM isolation
 is not implemented.

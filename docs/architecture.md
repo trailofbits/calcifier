@@ -150,6 +150,7 @@ not propagate the context.
 | ------- | -------------- |
 | `recipe.py`, `run_result.py`, `trace.py`, `trace_export.py`, `trace_profile.py` | Execution, decorators, CLI binding, records, export, and profiling. |
 | `agent_config.py`, `agent_events.py`, `agent_providers.py`, `filesystem_contract.py`, `registry.py`, `agents.py` | Configuration, transport, telemetry, filesystem contracts, and routing. |
+| `codex_auth.py` | Transfers file or OS-keyring credentials into Codex's private temporary home. |
 | `native_events.py` | One bounded JSONL decoder shared by live streams and saved provider output. |
 | `instruction_context.py`, `prepared_context.py` | Pinned original instructions and task bundles. |
 | `budget.py`, `clock.py`, `composition.py` | Shared limits, suspend-aware time, and child calls. |

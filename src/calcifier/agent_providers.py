@@ -16,7 +16,8 @@ from .agent_events import (
     AgentResult,
     _run_cli,
 )
-from .filesystem_contract import AgentError, FilesystemContract
+from .codex_auth import seed_codex_auth as _seed_codex_auth
+from .filesystem_contract import FilesystemContract
 from .native_events import parse_adapter_envelope
 
 
@@ -126,6 +127,8 @@ def codex_command(
             "computer_use",
             "-c",
             "project_doc_max_bytes=0",
+            "-c",
+            'cli_auth_credentials_store="file"',
         )
     )
     if model is not None:
@@ -331,16 +334,3 @@ class CommandCli(AgentProvider):
             env=adapter_env,
             event_parser=parse_adapter_envelope,
         )
-
-
-def _seed_codex_auth(config_home: Path) -> None:
-    original_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
-    source = original_home / "auth.json"
-    if not source.is_file():
-        return
-    destination = config_home / "auth.json"
-    try:
-        shutil.copyfile(source, destination)
-        destination.chmod(0o600)
-    except OSError as exc:
-        raise AgentError(f"could not prepare isolated Codex authentication: {exc}") from exc

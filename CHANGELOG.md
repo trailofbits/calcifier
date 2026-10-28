@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Codex calls preserve OS-keyring authentication when isolating configuration,
+  including `keyring` and `auto` credential storage. Credentials are staged only
+  in the private temporary home and removed after the call.
+
 ## v0.2.0 — 2026-10-23
 
 See the [release notes](docs/releases/v0.2.0.md) for contracts, validation limits,
