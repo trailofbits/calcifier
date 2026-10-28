@@ -26,7 +26,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "ruff>=0.12.0,<1.0",
     # Type-checks generated recipes. Pre-1.0 diagnostics change between releases, so pin exactly.
-    "ty==0.0.87",
+    "ty==0.0.93",
 ]
 
 [project.urls]
