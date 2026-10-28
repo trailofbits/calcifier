@@ -279,7 +279,15 @@ class CodexCli(AgentProvider):
             clean_env = {
                 key: value
                 for key, value in os.environ.items()
-                if key in {"PATH", "OPENAI_API_KEY", "SSL_CERT_FILE", "SSL_CERT_DIR", "TMPDIR"}
+                if key
+                in {
+                    "PATH",
+                    "CODEX_API_KEY",
+                    "OPENAI_API_KEY",
+                    "SSL_CERT_FILE",
+                    "SSL_CERT_DIR",
+                    "TMPDIR",
+                }
             }
             clean_env["CODEX_HOME"] = config_home
             return _run_cli(

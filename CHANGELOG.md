@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Codex calls preserve the `CODEX_API_KEY` non-interactive authentication override.
+  A nonblank override bypasses stored credentials, including locked OS keyrings,
+  while keeping the private temporary configuration home.
 - Codex calls preserve OS-keyring authentication when isolating configuration,
   including `keyring` and `auto` credential storage. Credentials are staged only
   in the private temporary home and removed after the call.

@@ -14,6 +14,9 @@ from .filesystem_contract import AgentError
 
 
 def seed_codex_auth(config_home: Path) -> None:
+    # Codex exec gives a nonblank CODEX_API_KEY precedence over stored credentials.
+    if os.environ.get("CODEX_API_KEY", "").strip():
+        return
     original_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
     mode = _credential_store_mode(original_home)
     if mode == "ephemeral":

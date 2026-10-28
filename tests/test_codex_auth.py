@@ -184,9 +184,10 @@ def test_absent_or_ephemeral_auth_is_not_materialized(auth_homes, mode):
     assert not (isolated / "auth.json").exists()
 
 
-def test_api_key_environment_is_preserved(auth_homes, monkeypatch):
+@pytest.mark.parametrize("variable", ["CODEX_API_KEY", "OPENAI_API_KEY"])
+def test_api_key_environment_is_preserved(auth_homes, monkeypatch, variable):
     original, isolated = auth_homes
-    monkeypatch.setenv("OPENAI_API_KEY", "fixture-api-key")
+    monkeypatch.setenv(variable, "fixture-api-key")
     observed = {}
 
     def fake_run(cmd, stdin, **kwargs):
@@ -198,8 +199,64 @@ def test_api_key_environment_is_preserved(auth_homes, monkeypatch):
 
     CodexCli().invoke("prompt")
 
-    assert observed["OPENAI_API_KEY"] == "fixture-api-key"
+    assert observed[variable] == "fixture-api-key"
     assert not (isolated / "auth.json").exists()
+
+
+@pytest.mark.parametrize("mode", ["file", "keyring", "auto"])
+@pytest.mark.parametrize("api_key", ["fixture-codex-api-key", "  fixture-codex-api-key  "])
+def test_codex_api_key_override_keeps_storage_and_configuration_isolated(
+    auth_homes, monkeypatch, mode, api_key
+):
+    original, _ = auth_homes
+    config = f'cli_auth_credentials_store = "{mode}"\nmodel = "unwanted-model"\n'.encode()
+    credentials = b'{"tokens":{"access_token":"saved-login"}}\r\n'
+    (original / "config.toml").write_bytes(config)
+    (original / "auth.json").write_bytes(credentials)
+    monkeypatch.setenv("CODEX_API_KEY", api_key)
+    monkeypatch.setenv("OPENAI_API_KEY", "separate-openai-key")
+    monkeypatch.setenv("UNRELATED_SECRET", "must-not-reach-codex")
+    homes = []
+
+    def fake_run(cmd, stdin, **kwargs):
+        env = kwargs["env"]
+        home = Path(env["CODEX_HOME"])
+        homes.append(home)
+        assert home != original
+        assert not (home / "config.toml").exists()
+        assert not (home / "auth.json").exists()
+        assert env["CODEX_API_KEY"] == api_key
+        assert env["OPENAI_API_KEY"] == "separate-openai-key"
+        assert "UNRELATED_SECRET" not in env
+        return AgentResult("ok", "ok", "", 0, "codex")
+
+    monkeypatch.setattr(agent_providers, "_run_cli", fake_run)
+
+    CodexCli().invoke("prompt")
+
+    assert len(homes) == 1 and not homes[0].exists()
+    assert (original / "config.toml").read_bytes() == config
+    assert (original / "auth.json").read_bytes() == credentials
+
+
+@pytest.mark.parametrize("api_key", ["", " \t\n"])
+def test_blank_codex_api_key_keeps_stored_authentication(auth_homes, monkeypatch, api_key):
+    original, isolated = auth_homes
+    (original / "config.toml").write_bytes(b'cli_auth_credentials_store = "keyring"\n')
+    credentials = '{"tokens":{"access_token":"saved-login"}}'
+    lookups = []
+
+    def lookup(home):
+        lookups.append(home)
+        return credentials
+
+    monkeypatch.setenv("CODEX_API_KEY", api_key)
+    monkeypatch.setattr(codex_auth, "_read_keyring_auth", lookup)
+
+    codex_auth.seed_codex_auth(isolated)
+
+    assert lookups == [original]
+    assert (isolated / "auth.json").read_bytes() == credentials.encode("utf-8")
 
 
 @pytest.mark.parametrize(
