@@ -64,7 +64,11 @@ falling back to the file. Keychain on macOS, Secret Service on Linux, and Window
 Credential Manager are supported. Only authentication is staged in a private
 temporary home with a mode-0600 `auth.json`; the child uses file storage and the
 temporary home is removed after the call. Other user settings are not copied.
-`OPENAI_API_KEY` remains in the child environment.
+`CODEX_API_KEY` is preserved for Codex's non-interactive API-key override. A
+nonblank value takes precedence over stored credentials; Calcifier skips reading
+the credential store and staging `auth.json` in that case. Empty or whitespace-only
+values leave the stored-login path in use. `OPENAI_API_KEY` also remains in the
+child environment for compatibility; use `CODEX_API_KEY` for `codex exec`.
 Process-only `ephemeral` credentials cannot be transferred to a new CLI process.
 Unlock the OS credential store and check `codex login status` if keyring access
 fails. Token refreshes in the temporary home are not written back to the original

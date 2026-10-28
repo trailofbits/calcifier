@@ -116,6 +116,7 @@ def pytest_configure(config: pytest.Config) -> None:
 @pytest.fixture(autouse=True)
 def _isolated_codex_auth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
+    monkeypatch.delenv("CODEX_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
 
