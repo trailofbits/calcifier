@@ -24,6 +24,43 @@ from tests.conftest import (
 pytestmark = pytest.mark.semantic_offline
 
 
+@pytest.mark.parametrize("instrumented", [False, True])
+def test_upstream_unmutated_collection_preserves_session_options(
+    tmp_path, monkeypatch, request, instrumented
+):
+    monkeypatch.setattr(request.config.option, "gremlins", True, raising=False)
+    pytest_configure(request.config)
+    (tmp_path / "pytest.ini").write_bytes(b"[pytest]\ndoctest_optionflags = NORMALIZE_WHITESPACE\n")
+    (tmp_path / "conftest.py").write_bytes(
+        b"def pytest_addoption(parser):\n"
+        b'    parser.addoption("--reruns", type=int, default=0)\n'
+        b"def pytest_collection_modifyitems(config):\n"
+        b'    assert config.getini("doctest_optionflags") == ["ELLIPSIS"]\n'
+        b'    assert config.getoption("reruns") == 3\n'
+    )
+    (tmp_path / "test_plain.py").write_bytes(b"def test_ok():\n    pass\n")
+    directory = (
+        gremlins._write_instrumented_sources(
+            {str(tmp_path / "alpha.py"): ast.parse("value = 1\n")}, tmp_path
+        )
+        if instrumented
+        else None
+    )
+    session = gremlins.GremlinSession(
+        instrumented_dir=directory,
+        doctest_ini_overrides=["-o", "doctest_optionflags=ELLIPSIS"],
+        rerun_options=["--reruns", "3"],
+    )
+    try:
+        # Collect ordinary tests through the same upstream control path as CI;
+        # no mutations are generated or executed.
+        outcome = gremlins._collect_unmutated(session, tmp_path, ["test_plain.py::test_ok"])
+        assert outcome.loads_cleanly, outcome.output
+    finally:
+        if directory is not None:
+            gremlins._cleanup_instrumented_dir(directory)
+
+
 def test_mutation_subprocess_executes_fixtures_parameters_and_real_faults(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
 ) -> None:
@@ -161,8 +198,10 @@ def test_import_mutants_need_an_executed_failing_probe_and_passing_control(
     try:
         result = subprocess.run(
             [
-                sys.executable,
-                str(instrumented / "gremlin_lightweight_runner.py"),
+                *gremlins._build_test_command(
+                    instrumented,
+                    doctest_ini_overrides=gremlins._doctest_ini_overrides(request.config),
+                ),
                 f"test_alpha.py::{selector}",
             ],
             cwd=tmp_path,
@@ -323,7 +362,7 @@ def test_probe_timeout_or_runner_failure_never_counts_as_a_kill(
                 '<testsuite><testcase name="test_selected_modules_import"/></testsuite>',
                 encoding="utf-8",
             )
-        return subprocess.CompletedProcess(command, 0, "test_selected.py::test_ok", "")
+        return subprocess.CompletedProcess(command, 0, f"{selected}::test_ok", "")
 
     monkeypatch.setattr(subprocess, "run", run_probe)
     assert not _import_failure_is_tested(tmp_path / "bootstrap.py", [str(selected)])
