@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest_gremlins.plugin as gremlins
@@ -64,11 +65,24 @@ def build_test_command(
     preserved_addopts: str = "",
     *,
     xdist_loaded: bool = False,
+    doctest_ini_overrides: Sequence[str] = (),
+    rerun_options: Sequence[str] = (),
 ) -> list[str]:
     if instrumented_dir is not None:
         # Our runner owns pytest options and confirms failures against passing controls.
-        return [sys.executable, str(instrumented_dir / "gremlin_lightweight_runner.py")]
-    return _BUILD_TEST_COMMAND(instrumented_dir, preserved_addopts, xdist_loaded=xdist_loaded)
+        return [
+            sys.executable,
+            str(instrumented_dir / "gremlin_lightweight_runner.py"),
+            *doctest_ini_overrides,
+            *rerun_options,
+        ]
+    return _BUILD_TEST_COMMAND(
+        instrumented_dir,
+        preserved_addopts,
+        xdist_loaded=xdist_loaded,
+        doctest_ini_overrides=doctest_ini_overrides,
+        rerun_options=rerun_options,
+    )
 
 
 def _copy_checkout(rootdir: Path, workspace: Path) -> Path:

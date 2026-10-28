@@ -61,10 +61,10 @@ def _probe_result(report: Path, *, failed: bool) -> bool:
         return False
 
 
-def _selectors_collect(bootstrap: Path, selectors: list[str]) -> bool:
+def _collected_files(bootstrap: Path, selectors: list[str]) -> list[str]:
     try:
         collection = subprocess.run(
-            [sys.executable, str(bootstrap), *_FLAGS, "--collect-only", *selectors],
+            [sys.executable, str(bootstrap), *_FLAGS, "--collect-only", "--color=no", *selectors],
             env={**os.environ, "ACTIVE_GREMLIN": "", "PYTHONIOENCODING": "utf-8"},
             capture_output=True,
             text=True,
@@ -74,9 +74,18 @@ def _selectors_collect(bootstrap: Path, selectors: list[str]) -> bool:
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         print(f"Mutation selector control could not finish: {exc}", file=sys.stderr, flush=True)
-        return False
+        return []
     print(f"Mutation selector control:\n{collection.stdout}{collection.stderr}", flush=True)
-    return collection.returncode == 0 and "::" in collection.stdout
+    if collection.returncode != 0:
+        return []
+    # Options travel alongside node IDs. Probe the files pytest actually collected.
+    return sorted(
+        {
+            str(path.resolve())
+            for line in collection.stdout.splitlines()
+            if "::" in line and (path := Path(line.partition("::")[0])).is_file()
+        }
+    )
 
 
 def _import_failure_is_tested(bootstrap: Path, selectors: list[str]) -> bool:
@@ -93,12 +102,10 @@ def _import_failure_is_tested(bootstrap: Path, selectors: list[str]) -> bool:
         sources = {origin: entry["source"] for origin, entry in entries.items()}
         if not active or _unique_mutant_module(sources, active) is None:
             return False
-        files = sorted({str(Path(selector.split("::", 1)[0]).resolve()) for selector in selectors})
-        if not files or any(not Path(path).is_file() for path in files):
-            return False
     except (KeyError, OSError, ValueError, TypeError, SyntaxError):
         return False
-    if not _selectors_collect(bootstrap, selectors):
+    files = _collected_files(bootstrap, selectors)
+    if not files:
         return False
     return _run_import_probes(bootstrap, files, active)
 
