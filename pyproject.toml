@@ -23,6 +23,7 @@ classifiers = [
 ]
 dependencies = [
     "jsonschema>=4.21,<5",
+    "keyring>=25.7,<26",
     "pydantic>=2.13.4",
     "ruff>=0.12.0,<1.0",
     # Type-checks generated recipes. Pre-1.0 diagnostics change between releases, so pin exactly.

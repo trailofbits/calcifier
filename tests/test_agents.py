@@ -120,6 +120,8 @@ def test_host_command_known_answers(tmp_path: Path) -> None:
         "computer_use",
         "-c",
         "project_doc_max_bytes=0",
+        "-c",
+        'cli_auth_credentials_store="file"',
         "--model",
         "gpt-test",
         "-c",
