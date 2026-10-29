@@ -306,12 +306,7 @@ class _Flow:
             for value, target in bindings:
                 if not self.tainted(value, names):
                     continue
-                nodes = (target,) if isinstance(target, ast.arg) else ast.walk(target)
-                new = {
-                    self.scoped_names[item]
-                    for item in nodes
-                    if isinstance(item, ast.Name | ast.arg)
-                } - names
+                new = {self.scoped_names[item] for item in _target_names(target)} - names
                 if new:
                     names |= new
                     changed = True
@@ -421,10 +416,25 @@ def _local_reads(function: Function) -> Iterator[ast.Name]:
         pending.extend(ast.iter_child_nodes(node))
 
 
+def _target_names(target: ast.AST) -> Iterator[ast.Name | ast.arg]:
+    """Follow assignment receivers without treating computed selectors as writes."""
+    pending = [target]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, ast.Name | ast.arg):
+            yield node
+        elif isinstance(node, ast.Attribute | ast.Subscript | ast.Starred):
+            pending.append(node.value)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            pending.append(node.func.value)
+        else:
+            pending.extend(ast.iter_child_nodes(node))
+
+
 def _last_bindings(function: Function, flow: _Flow) -> dict[str, tuple[int, int]]:
     last: dict[str, tuple[int, int]] = {}
     for _, target in _bindings(function, flow):
-        for node in ast.walk(target):
+        for node in _target_names(target):
             if isinstance(node, ast.Name):
                 position = (node.lineno, node.col_offset)
                 name = flow.scoped_names[node]
@@ -433,21 +443,26 @@ def _last_bindings(function: Function, flow: _Flow) -> dict[str, tuple[int, int]
 
 
 def _bindings(  # noqa: C901 - assignment and mutation binding forms
-    function: Function, flow: _Flow
+    function: Function | ast.Lambda, flow: _Flow, *, mutations_only: bool = False
 ) -> Iterator[tuple[ast.AST, ast.AST]]:
-    """Yield ``(value, target)`` for every binding whose target takes on the value's taint."""
+    """Yield value/target bindings, or direct receiver mutations without nested calls."""
     for node in ast.walk(function):
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                yield node.value, target
+                if not mutations_only or isinstance(target, ast.Attribute | ast.Subscript):
+                    yield node.value, target
         elif isinstance(node, ast.AnnAssign | ast.AugAssign | ast.NamedExpr) and node.value:
-            yield node.value, node.target
+            if not mutations_only or isinstance(node.target, ast.Attribute | ast.Subscript):
+                yield node.value, node.target
         elif isinstance(node, ast.For | ast.AsyncFor | ast.comprehension):
-            yield node.iter, node.target
+            if not mutations_only:
+                yield node.iter, node.target
         elif isinstance(node, ast.withitem) and node.optional_vars is not None:
-            yield node.context_expr, node.optional_vars
+            if not mutations_only:
+                yield node.context_expr, node.optional_vars
         elif isinstance(node, ast.Call):
-            yield from _call_bindings(node, flow)
+            if not mutations_only:
+                yield from _call_bindings(node, flow)
             if isinstance(node.func, ast.Attribute) and node.func.attr in {
                 "append",
                 "extend",
@@ -544,6 +559,16 @@ def _invocation_bindings(  # noqa: C901 - positional, keyword, default, and vari
             if (value := keywords.pop(parameter.arg, None)) is not None:
                 values[parameter] = value
         yield from ((value, parameter) for parameter, value in values.items() if value is not None)
+        actuals = {
+            flow.scoped_names[parameter]: value
+            for parameter, value in values.items()
+            if value is not None
+        }
+        # A write through a parameter also changes the caller's supplied container.
+        for value, target in _bindings(callee, flow, mutations_only=True):
+            for name in _target_names(target):
+                if (actual := actuals.get(flow.scoped_names[name])) is not None:
+                    yield value, actual
         if args.vararg is not None:
             for value in invocation.args[len(parameters) :]:
                 yield value, args.vararg

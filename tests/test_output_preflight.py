@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from calcifier import ensure_directory, recipe, write_text
@@ -168,6 +170,8 @@ def test_clean_output_set_is_created_and_written(tmp_path, compiled_collector):
         (("../escape.txt",), "escapes the selected directory"),
         ((".git/config",), "cannot modify .git paths"),
         (("parent", "parent/child.txt"), "parent directory"),
+        (("parent/child.txt", "parent"), "parent directory"),
+        (("a/b/c.txt", "a"), "parent directory"),
         (("parent/child.txt",), "non-directory parent"),
     ],
 )
@@ -240,3 +244,60 @@ def test_compiler_scratch_redirection_does_not_hide_actual_output_collisions(tmp
     assert "existing planned output" in (result.error or "")
     assert sentinel.read_bytes() == b"keep\n"
     assert list(scratch.iterdir()) == []
+
+
+def test_flat_output_preflight_does_not_compare_every_pair(tmp_path, monkeypatch):
+    outputs = tuple(f"finding-{number}.json" for number in range(512))
+    comparisons = 0
+    original = Path.is_relative_to
+
+    def counted(path, other):
+        nonlocal comparisons
+        comparisons += 1
+        return original(path, other)
+
+    monkeypatch.setattr(Path, "is_relative_to", counted)
+
+    @recipe(output_root=tmp_path / "outputs")
+    def workflow() -> int:
+        ensure_directory(output_files=outputs)
+        return len(outputs)
+
+    result = workflow.run()
+
+    assert result.ok, result.error
+    assert result.output == len(outputs)
+    assert comparisons < 32 * len(outputs)
+    assert list((tmp_path / "outputs").iterdir()) == []
+
+
+def test_large_output_catalog_completes_the_whole_compiler_dry_run(tmp_path):
+    skill = tmp_path / "SKILL.md"
+    skill.write_bytes(b"# Prepare outputs\nPreflight 10,000 finding destinations.\n")
+    source = """from calcifier import ensure_directory, recipe
+
+@recipe(output_root="artifacts")
+def workflow() -> int:
+    outputs = tuple(f"finding-{number}.json" for number in range(10_000))
+    ensure_directory(output_files=outputs)
+    return len(outputs)
+
+if __name__ == "__main__":
+    raise SystemExit(workflow.cli())
+"""
+    registry = Registry()
+    registry.register(one_draft(source))
+
+    artifact = prepare_artifact(skill, registry)
+
+    assert artifact.outcome == "compiled"
+    assert artifact.dry_run is not None and artifact.dry_run.status == "passed"
+
+
+def test_duplicate_and_shared_prefix_outputs_keep_their_existing_policy(tmp_path):
+    @recipe(output_root=tmp_path)
+    def workflow() -> bool:
+        ensure_directory(output_files=("a", "a", "ab/child.json", "ab/other.json"))
+        return True
+
+    assert workflow.run().ok

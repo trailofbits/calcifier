@@ -627,6 +627,74 @@ def run(paths):
     assert bool(errors) == tainted
 
 
+@pytest.mark.parametrize(
+    "store",
+    [
+        "groups[str(root)] = answer",
+        "groups[str(root)]: str = answer",
+        "groups[str(root)] += answer",
+        "groups[str(root)][key] = answer",
+        "groups[str(root)].value = answer",
+        "groups.setdefault(str(root), {})[key] = answer",
+        "groups[str(root)], *other = [answer, answer]",
+    ],
+)
+@pytest.mark.parametrize(
+    "operand,tainted",
+    [("root", False), ("key", False), ('str("trusted")', False), ("str(groups)", True)],
+)
+def test_assignment_taints_the_container_without_tainting_selectors(store, operand, tainted):
+    errors = _errors(f"""
+def run(root):
+    groups = {{}}
+    key = "details"
+    answer = agent("worker", "review", working_directory=root)
+    {store}
+    run_command(["inspect", {operand}], timeout_seconds=1)
+""")
+    assert bool(errors) == tainted
+
+
+@pytest.mark.parametrize("model_value", [False, True])
+@pytest.mark.parametrize(
+    "store",
+    [
+        "groups[str(root)] = value",
+        "groups.update({str(root): value})",
+        "groups.setdefault(str(root), []).append(value)",
+    ],
+)
+def test_computed_store_helper_preserves_trusted_roots_and_model_values(model_value, store):
+    operand = "groups[str(root)]" if model_value else "str(root)"
+    errors = _errors(f"""
+def remember(groups, root, value):
+    {store}
+def run(root):
+    trusted = {{}}
+    groups = {{}}
+    remember(trusted, root, "host data")
+    answer = agent("worker", "review", working_directory=root)
+    remember(groups, root, answer)
+    run_command(["inspect", {operand}], timeout_seconds=1)
+    agent("worker", "inspect", working_directory=root)
+""")
+    assert len(errors) == int(model_value)
+
+
+def test_rebinding_a_helper_parameter_does_not_mutate_the_callers_argument():
+    assert (
+        _errors("""
+def replace(root, value):
+    root = value
+def run(root):
+    answer = agent("worker", "review", working_directory=root)
+    replace(root, answer)
+    return run_command(["inspect", root], timeout_seconds=1)
+""")
+        == []
+    )
+
+
 @pytest.mark.parametrize("keyword_only", ["", "*, "])
 @pytest.mark.parametrize("default,tainted", [("answer", True), ('"."', False)])
 @pytest.mark.parametrize("callback", [False, True])
