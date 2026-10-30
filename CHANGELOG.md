@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- Computed assignment targets taint their mutated container without tainting
+  selector inputs or built-ins. Helper mutations retain model-derived taint
+  when their containers return to the caller (#22).
+- Output preflight checks planned-file ancestors by membership instead of
+  comparing every pair, retaining output protections for large catalogs (#23).
 - Codex calls preserve the `CODEX_API_KEY` non-interactive authentication override.
   A nonblank override bypasses stored credentials, including locked OS keyrings,
   while keeping the private temporary configuration home.

@@ -87,6 +87,10 @@ def ensure_directory(
     such as an audited project. ``overwrite=True`` permits existing regular files only
     when the run's output policy permits replacement; --output-dir protection still applies.
     This validates destinations before external writes; it does not sandbox the subprocess.
+    For data-dependent counts, prefer complete aggregate artifacts or bounded batches of
+    trusted output names over catalogs multiplied by input size and phase count.
+    If per-record capacity is bounded, retain the complete structured result in an
+    aggregate artifact and report overflow rather than silently discarding records.
     """
     for name, paths in (("output_files", output_files), ("exclude_roots", exclude_roots)):
         if isinstance(paths, (str, bytes)):
@@ -139,7 +143,8 @@ def _preflight_outputs(
         if target == directory or not target.is_relative_to(directory):
             raise RecipeError(f"planned output escapes the selected directory: {candidate}")
         _preflight_output_file(candidate, overwrite=overwrite)
-    if any(a != b and b.is_relative_to(a) for a in resolved for b in resolved):
+    planned = set(resolved)
+    if any(parent in planned for target in planned for parent in target.parents):
         raise RecipeError("a planned output file is also another output's parent directory")
     return tuple(_output_path(file) for file in candidates)
 

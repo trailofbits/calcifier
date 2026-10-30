@@ -119,6 +119,13 @@ not sandbox a subprocess or protect against concurrent filesystem changes;
 the supplied program must use those checked destinations. Verification after a
 write checks the result and cannot undo an earlier overwrite.
 
+For data-dependent output counts, prefer complete aggregate artifacts or bounded
+batches of trusted output names. Avoid catalogs multiplied by input size and
+phase count. If per-record files have an explicit capacity, save the complete
+structured result in an aggregate artifact and report overflow instead of
+silently discarding records. Each batch still needs complete preflight before
+its subprocess runs.
+
 Project modifications use a supplied program through `run_command()` or agent
 `writable_paths`. Direct `Path.write_text()` calls are not admitted. Commands run
 argv on the host without a shell; `mutating=True` declares an effect before
