@@ -58,7 +58,7 @@ jobs:
           git merge-base --is-ancestor "$TAG_COMMIT" origin/main
           test "$TAG_COMMIT" = "$(git rev-parse HEAD)"
 
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           # Release artifacts must not depend on caches writable by lower-trust workflows.
           enable-cache: false
